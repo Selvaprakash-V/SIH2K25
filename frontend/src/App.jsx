@@ -56,6 +56,8 @@ function App() {
 function AppContent({ darkMode, toggleDarkMode }) {
   const { user } = useAuth()
 
+  console.log('AppContent - Current user:', user)
+
   return (
     <>
       {user && <Navbar darkMode={darkMode} toggleDarkMode={toggleDarkMode} />}
@@ -69,13 +71,16 @@ function AppContent({ darkMode, toggleDarkMode }) {
           <Route 
             path="/dashboard" 
             element={
-              user
-                ? user.role === 'state'
-                  ? <StateDashboard />
-                  : user.role === 'district'
-                    ? <DistrictDashboard />
-                    : <Dashboard />
-                : <Navigate to="/login" />
+              user ? (
+                <div>
+                  <h1>Dashboard Loading...</h1>
+                  <p>User: {user.name}</p>
+                  <p>Role: {user.role}</p>
+                  {user.role === 'state' ? <StateDashboard /> : 
+                   user.role === 'district' ? <DistrictDashboard /> : 
+                   <Dashboard />}
+                </div>
+              ) : <Navigate to="/login" />
             }
           />
           <Route 

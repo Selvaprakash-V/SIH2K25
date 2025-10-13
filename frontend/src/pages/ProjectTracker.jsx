@@ -10,7 +10,15 @@ import {
   TrendingUp,
   CheckCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  Users,
+  IndianRupee,
+  ArrowRight,
+  Edit,
+  X,
+  ThumbsUp,
+  ThumbsDown
 } from 'lucide-react'
 
 export default function ProjectTracker() {
@@ -33,13 +41,27 @@ export default function ProjectTracker() {
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [user])
 
   const fetchData = async () => {
     try {
+      // Build query parameters based on user role
+      let projectParams = {}
+      let villageParams = {}
+      
+      if (user?.role === 'district') {
+        projectParams.state = user.state
+        projectParams.district = user.district
+        villageParams.state = user.state
+        villageParams.district = user.district
+      } else if (user?.role === 'state') {
+        projectParams.state = user.state
+        villageParams.state = user.state
+      }
+
       const [projectsRes, villagesRes] = await Promise.all([
-        projectAPI.getProjects(),
-        villageAPI.getVillages()
+        projectAPI.getProjects(projectParams),
+        villageAPI.getVillages(villageParams)
       ])
       
       setProjects(projectsRes.data)
@@ -76,8 +98,16 @@ export default function ProjectTracker() {
         return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
       case 'in_progress':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
+      case 'approved':
+        return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400'
+      case 'pending_admin':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
+      case 'pending_state':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400'
       case 'planned':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+      case 'rejected':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
     }
@@ -89,10 +119,29 @@ export default function ProjectTracker() {
         return <CheckCircle className="h-4 w-4" />
       case 'in_progress':
         return <Clock className="h-4 w-4" />
+      case 'approved':
+        return <ThumbsUp className="h-4 w-4" />
+      case 'pending_admin':
+        return <FileText className="h-4 w-4" />
+      case 'pending_state':
+        return <Clock className="h-4 w-4" />
       case 'planned':
         return <AlertCircle className="h-4 w-4" />
+      case 'rejected':
+        return <ThumbsDown className="h-4 w-4" />
       default:
         return <Clock className="h-4 w-4" />
+    }
+  }
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'pending_state':
+        return 'Pending State Approval'
+      case 'pending_admin':
+        return 'Pending Admin Approval'
+      default:
+        return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')
     }
   }
 
@@ -133,9 +182,38 @@ export default function ProjectTracker() {
     const total = projects.length
     const completed = projects.filter(p => p.status === 'completed').length
     const inProgress = projects.filter(p => p.status === 'in_progress').length
-    const planned = projects.filter(p => p.status === 'planned').length
+    const approved = projects.filter(p => p.status === 'approved').length
+    const pendingApproval = projects.filter(p => ['pending_state', 'pending_admin'].includes(p.status)).length
     
-    return { total, completed, inProgress, planned }
+    return { total, completed, inProgress, approved, pendingApproval }
+  }
+
+  const handleApproveProject = async (projectId, nextStatus) => {
+    try {
+      await projectAPI.updateProject(projectId, { 
+        status: nextStatus,
+        approved_by: user?.name || user?.role 
+      })
+      fetchData() // Refresh the list
+      alert(`Project ${nextStatus === 'approved' ? 'approved' : 'forwarded'} successfully!`)
+    } catch (error) {
+      console.error('Failed to update project:', error)
+      alert('Failed to update project status')
+    }
+  }
+
+  const handleRejectProject = async (projectId, reason) => {
+    try {
+      await projectAPI.updateProject(projectId, { 
+        status: 'rejected',
+        rejection_reason: reason || 'Not specified'
+      })
+      fetchData() // Refresh the list
+      alert('Project rejected successfully!')
+    } catch (error) {
+      console.error('Failed to reject project:', error)
+      alert('Failed to reject project')
+    }
   }
 
   const stats = getProjectStats()
@@ -157,20 +235,33 @@ export default function ProjectTracker() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Project Tracker
+              SCA Scheme Projects
+              {user?.role === 'district' && ` - ${user.district}`}
+              {user?.role === 'state' && ` - ${user.state} State`}
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-2">
-              Monitor and manage development projects across villages
+              {user?.role === 'district' 
+                ? 'Manage Special Central Assistance projects for SC-majority villages'
+                : user?.role === 'state'
+                ? 'Review and approve district project submissions'
+                : 'Monitor SCA scheme project implementations across all states'
+              }
             </p>
+            <div className="mt-2 text-sm">
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                <Users className="w-3 h-3 mr-1" />
+                {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)} Officer
+              </span>
+            </div>
           </div>
           
-          {(user?.role === 'admin' || user?.role === 'state') && (
+          {user?.role === 'district' && (
             <button
               onClick={() => setShowCreateForm(true)}
               className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
             >
               <Plus className="h-4 w-4 mr-2" />
-              New Project
+              Submit New Project
             </button>
           )}
         </div>
@@ -227,15 +318,31 @@ export default function ProjectTracker() {
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-                <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+              <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Planned
+                  Approved
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.planned}
+                  {stats.approved}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
+                <AlertCircle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Pending Approval
+                </p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {stats.pendingApproval}
                 </p>
               </div>
             </div>
@@ -333,7 +440,7 @@ export default function ProjectTracker() {
                     
                     <div className={`flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}>
                       {getStatusIcon(project.status)}
-                      <span className="ml-1 capitalize">{project.status.replace('_', ' ')}</span>
+                      <span className="ml-1">{getStatusText(project.status)}</span>
                     </div>
                   </div>
 
@@ -369,19 +476,67 @@ export default function ProjectTracker() {
                     )}
                   </div>
 
-                  {/* Actions */}
-                  {(user?.role === 'admin' || user?.role === 'state') && (
-                    <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex space-x-2">
-                        <button className="flex-1 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-                          Update Progress
-                        </button>
-                        <button className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                          View Details
-                        </button>
-                      </div>
+                  {/* SCA Approval Actions */}
+                  <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="mb-2">
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        Status: {getStatusText(project.status)}
+                      </span>
                     </div>
-                  )}
+                    
+                    <div className="flex space-x-2">
+                      {/* State Officer Actions */}
+                      {user?.role === 'state' && project.status === 'pending_state' && (
+                        <>
+                          <button 
+                            onClick={() => handleApproveProject(project.id, 'pending_admin')}
+                            className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Forward to Admin
+                          </button>
+                          <button 
+                            onClick={() => {
+                              const reason = prompt('Reason for rejection:')
+                              if (reason) handleRejectProject(project.id, reason)
+                            }}
+                            className="px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center"
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Reject
+                          </button>
+                        </>
+                      )}
+                      
+                      {/* Admin Actions */}
+                      {user?.role === 'admin' && project.status === 'pending_admin' && (
+                        <>
+                          <button 
+                            onClick={() => handleApproveProject(project.id, 'approved')}
+                            className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Final Approval
+                          </button>
+                          <button 
+                            onClick={() => {
+                              const reason = prompt('Reason for rejection:')
+                              if (reason) handleRejectProject(project.id, reason)
+                            }}
+                            className="px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center"
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Reject
+                          </button>
+                        </>
+                      )}
+                      
+                      {/* View Details for All */}
+                      <button className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        View Details
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))

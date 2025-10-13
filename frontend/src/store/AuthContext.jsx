@@ -14,20 +14,31 @@ export function useAuth() {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isNewSession, setIsNewSession] = useState(true)
 
   useEffect(() => {
-    // Check for stored auth data on mount
+    // Check if there's a fresh login session
+    const justLoggedIn = sessionStorage.getItem('justLoggedIn')
     const token = localStorage.getItem('token')
     const userData = localStorage.getItem('user')
     
-    if (token && userData) {
+    if (justLoggedIn === 'true' && token && userData) {
+      // User just logged in, restore their session
       try {
         setUser(JSON.parse(userData))
+        setIsNewSession(false)
+        sessionStorage.removeItem('justLoggedIn')
       } catch (error) {
         console.error('Failed to parse stored user data:', error)
         localStorage.removeItem('token')
         localStorage.removeItem('user')
       }
+    } else {
+      // Clear any old sessions
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      setUser(null)
+      setIsNewSession(true)
     }
     
     setLoading(false)
@@ -35,13 +46,18 @@ export function AuthProvider({ children }) {
 
   const login = async (credentials) => {
     try {
+      console.log('Attempting login with:', credentials)
       const response = await authAPI.login(credentials)
+      console.log('Login response:', response.data)
       const { access_token, user: userData } = response.data
       
       localStorage.setItem('token', access_token)
       localStorage.setItem('user', JSON.stringify(userData))
+      sessionStorage.setItem('justLoggedIn', 'true') // Mark as fresh login
       setUser(userData)
+      setIsNewSession(false) // Mark as logged in session
       
+      console.log('User set to:', userData)
       return { success: true }
     } catch (error) {
       return { 
@@ -67,6 +83,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     setUser(null)
+    setIsNewSession(true)
   }
 
   const value = {
@@ -74,7 +91,8 @@ export function AuthProvider({ children }) {
     login,
     signup,
     logout,
-    loading
+    loading,
+    isNewSession
   }
 
   return (

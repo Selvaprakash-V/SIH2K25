@@ -1,19 +1,45 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../store/AuthContext'
 import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 
 export default function Login() {
   const { login, signup } = useAuth()
+  const navigate = useNavigate()
   const [isSignup, setIsSignup] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [states, setStates] = useState([])
+  const [districts, setDistricts] = useState([])
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-  role: 'district'
+    role: 'district',
+    state: '',
+    district: ''
   })
+
+  // Fetch states on component mount
+  useEffect(() => {
+    fetch('http://localhost:8001/api/states')
+      .then(res => res.json())
+      .then(data => setStates(data.states))
+      .catch(err => console.error('Failed to fetch states:', err))
+  }, [])
+
+  // Fetch districts when state changes
+  useEffect(() => {
+    if (formData.state) {
+      fetch(`http://localhost:8001/api/districts/${formData.state}`)
+        .then(res => res.json())
+        .then(data => setDistricts(data.districts))
+        .catch(err => console.error('Failed to fetch districts:', err))
+    } else {
+      setDistricts([])
+    }
+  }, [formData.state])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -30,7 +56,10 @@ export default function Login() {
       } else if (isSignup) {
         setIsSignup(false)
         setError('')
-  setFormData({ name: '', email: '', password: '', role: 'district' })
+        setFormData({ name: '', email: '', password: '', role: 'district', state: '', district: '' })
+      } else {
+        // Successful login - navigate to dashboard
+        navigate('/dashboard')
       }
     } catch (err) {
       setError('An unexpected error occurred')
@@ -40,9 +69,12 @@ export default function Login() {
   }
 
   const handleChange = (e) => {
+    const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [name]: value,
+      // Reset district when state changes
+      ...(name === 'state' ? { district: '' } : {})
     }))
   }
 
@@ -66,13 +98,32 @@ export default function Login() {
         {!isSignup && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-              Demo Credentials:
+              SCA Scheme Demo Credentials:
             </h3>
             <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
               <div><strong>Admin:</strong> admin@example.com / password</div>
-              <div><strong>State:</strong> state@example.com / password</div>
-              <div><strong>District:</strong> district@example.com / password</div>
+              <div><strong>Sikkim State:</strong> sikkim.state@gov.in / password</div>
+              <div><strong>East Sikkim:</strong> east.sikkim@gov.in / password</div>
+              <div><strong>West Sikkim:</strong> west.sikkim@gov.in / password</div>
+              <div><strong>North Sikkim:</strong> north.sikkim@gov.in / password</div>
+              <div><strong>South Sikkim:</strong> south.sikkim@gov.in / password</div>
             </div>
+          </div>
+        )}
+
+        {/* Clear Session Button */}
+        {!isSignup && (
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.clear()
+                window.location.reload()
+              }}
+              className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+            >
+              Clear Session & Start Fresh
+            </button>
           </div>
         )}
 
@@ -145,22 +196,66 @@ export default function Login() {
             </div>
 
             {isSignup && (
-              <div>
-                <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Role
-                </label>
-                <select
-                  id="role"
-                  name="role"
-                  value={formData.role}
-                  onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                >
-                  <option value="district">District</option>
-                  <option value="state">State</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
+              <>
+                <div>
+                  <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Role
+                  </label>
+                  <select
+                    id="role"
+                    name="role"
+                    value={formData.role}
+                    onChange={handleChange}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                  >
+                    <option value="district">District Officer</option>
+                    <option value="state">State Officer</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+
+                {(formData.role === 'state' || formData.role === 'district') && (
+                  <div>
+                    <label htmlFor="state" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      State
+                    </label>
+                    <select
+                      id="state"
+                      name="state"
+                      value={formData.state}
+                      onChange={handleChange}
+                      required
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    >
+                      <option value="">Select State</option>
+                      {states.map(state => (
+                        <option key={state} value={state}>{state}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {formData.role === 'district' && formData.state && (
+                  <div>
+                    <label htmlFor="district" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      District
+                    </label>
+                    <select
+                      id="district"
+                      name="district"
+                      value={formData.district}
+                      onChange={handleChange}
+                      required
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    >
+                      <option value="">Select District</option>
+                      {districts.map(district => (
+                        <option key={district} value={district}>{district}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -193,7 +288,7 @@ export default function Login() {
               onClick={() => {
                 setIsSignup(!isSignup)
                 setError('')
-                setFormData({ name: '', email: '', password: '', role: 'district' })
+                setFormData({ name: '', email: '', password: '', role: 'district', state: '', district: '' })
               }}
               className="text-primary-600 dark:text-primary-400 hover:text-primary-500 text-sm font-medium"
             >

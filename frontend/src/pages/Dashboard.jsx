@@ -61,13 +61,27 @@ export default function Dashboard({ role: propRole }) {
 
   useEffect(() => {
     fetchDashboardData()
-  }, [])
+  }, [user])
 
   const fetchDashboardData = async () => {
     try {
+      // Build query parameters based on user role
+      let villageParams = {}
+      let gapParams = {}
+      
+      if (user?.role === 'district') {
+        villageParams.state = user.state
+        villageParams.district = user.district
+        gapParams.state = user.state
+        gapParams.district = user.district
+      } else if (user?.role === 'state') {
+        villageParams.state = user.state
+        gapParams.state = user.state
+      }
+
       const [villagesRes, gapsRes] = await Promise.all([
-        villageAPI.getVillages(),
-        gapAPI.getGaps()
+        villageAPI.getVillages(villageParams),
+        gapAPI.getGaps(gapParams)
       ])
 
       const villageData = villagesRes.data
@@ -390,11 +404,21 @@ export default function Dashboard({ role: propRole }) {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Village Development Dashboard
+            SCA Scheme Dashboard
+            {user?.role === 'district' && ` - ${user.district}, ${user.state}`}
+            {user?.role === 'state' && ` - ${user.state} State`}
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Monitor and track rural development progress across SC-majority villages
+            {user?.role === 'district' 
+              ? `Monitor SC-majority villages in ${user.district} district for Special Central Assistance scheme`
+              : user?.role === 'state'
+              ? `Monitor all districts in ${user.state} state for SCA scheme implementation`
+              : 'Monitor and track rural development progress across SC-majority villages under SCA scheme'
+            }
           </p>
+          <div className="mt-2 text-sm text-blue-600 dark:text-blue-400">
+            <span className="font-medium">Role:</span> {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)} Officer
+          </div>
         </div>
 
         {/* Stats Cards */}
