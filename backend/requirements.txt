@@ -1,3 +1,21 @@
-fastapi
-uvicorn[standard]
-python-dotenv
+# Core web framework
+fastapi==0.115.6
+uvicorn==0.30.6
+
+# Config & uploads
+python-dotenv==1.1.1
+python-multipart==0.0.20
+
+# Auth & security
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+
+# Database (MongoDB async driver)
+motor==3.7.1
+
+# Media uploads
+cloudinary==1.44.1
+
+# Explicit pydantic v2 (FastAPI uses v2 APIs in our code)
+pydantic==2.9.2
+pydantic-core==2.23.4

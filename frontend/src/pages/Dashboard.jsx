@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { villageAPI, gapAPI } from '../services/api'
+import { villageAPI, gapAPI, projectAPI } from '../services/api'
 import { 
   Users, 
   MapPin, 
@@ -12,7 +12,10 @@ import {
   Zap,
   GraduationCap,
   Heart,
-  Wifi
+  Wifi,
+  Eye,
+  Edit,
+  X
 } from 'lucide-react'
 import {
   BarChart,
@@ -36,6 +39,20 @@ export default function Dashboard() {
   })
   const [villages, setVillages] = useState([])
   const [gapData, setGapData] = useState([])
+  const [problemTableData, setProblemTableData] = useState([])
+  const [filteredProblemData, setFilteredProblemData] = useState([])
+  const [activeFilter, setActiveFilter] = useState('All')
+  const [selectedProblem, setSelectedProblem] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+  const [projectDetails, setProjectDetails] = useState({
+    budget: '',
+    description: '',
+    timeline: '',
+    priority: 'Medium',
+    contactPerson: '',
+    phoneNumber: '',
+    additionalNotes: ''
+  })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -72,6 +89,13 @@ export default function Dashboard() {
       // Prepare gap analysis data
       const gaps = analyzeGaps(villageData)
       setGapData(gaps)
+
+      // Generate problem table data
+      const problemData = generateProblemTableData(villageData)
+      // Sort by people affected in descending order by default
+      const sortedData = problemData.sort((a, b) => b.peopleAffected - a.peopleAffected)
+      setProblemTableData(sortedData)
+      setFilteredProblemData(sortedData)
 
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)
@@ -129,6 +153,205 @@ export default function Dashboard() {
       villages: value,
       percentage: villages.length > 0 ? Math.round((value / villages.length) * 100) : 0
     }))
+  }
+
+  const generateProblemTableData = (villages) => {
+    const problemData = []
+
+    villages.forEach(village => {
+      if (!village.amenities) return
+
+      const amenities = village.amenities
+      const problems = []
+
+      if (amenities.water === 0) {
+        problems.push({
+          problem: "No Water Access",
+          village: village.name,
+          state: village.state,
+          peopleAffected: village.population,
+          scRatio: village.sc_ratio,
+          severity: "Critical",
+          villageId: village.id
+        })
+      }
+
+      if (amenities.electricity < 50) {
+        problems.push({
+          problem: "Poor Electricity Coverage",
+          village: village.name,
+          state: village.state,
+          peopleAffected: Math.round(village.population * (1 - amenities.electricity / 100)),
+          scRatio: village.sc_ratio,
+          severity: "Critical",
+          villageId: village.id
+        })
+      } else if (amenities.electricity < 80) {
+        problems.push({
+          problem: "Inadequate Electricity Coverage",
+          village: village.name,
+          state: village.state,
+          peopleAffected: Math.round(village.population * (1 - amenities.electricity / 100)),
+          scRatio: village.sc_ratio,
+          severity: "Moderate",
+          villageId: village.id
+        })
+      }
+
+      if (amenities.schools === 0) {
+        problems.push({
+          problem: "No Schools Available",
+          village: village.name,
+          state: village.state,
+          peopleAffected: Math.round(village.population * 0.2), // Assume 20% school-age children
+          scRatio: village.sc_ratio,
+          severity: "Critical",
+          villageId: village.id
+        })
+      }
+
+      if (amenities.health_centers === 0) {
+        problems.push({
+          problem: "No Healthcare Facilities",
+          village: village.name,
+          state: village.state,
+          peopleAffected: village.population,
+          scRatio: village.sc_ratio,
+          severity: "Critical",
+          villageId: village.id
+        })
+      }
+
+      if (amenities.toilets < 40) {
+        problems.push({
+          problem: "Poor Sanitation Coverage",
+          village: village.name,
+          state: village.state,
+          peopleAffected: Math.round(village.population * (1 - amenities.toilets / 100)),
+          scRatio: village.sc_ratio,
+          severity: "Critical",
+          villageId: village.id
+        })
+      } else if (amenities.toilets < 70) {
+        problems.push({
+          problem: "Inadequate Sanitation Coverage",
+          village: village.name,
+          state: village.state,
+          peopleAffected: Math.round(village.population * (1 - amenities.toilets / 100)),
+          scRatio: village.sc_ratio,
+          severity: "Moderate",
+          villageId: village.id
+        })
+      }
+
+      if (amenities.internet < 50) {
+        problems.push({
+          problem: "Poor Internet Connectivity",
+          village: village.name,
+          state: village.state,
+          peopleAffected: Math.round(village.population * (1 - amenities.internet / 100)),
+          scRatio: village.sc_ratio,
+          severity: "Moderate",
+          villageId: village.id
+        })
+      }
+
+      problemData.push(...problems)
+    })
+
+    return problemData
+  }
+
+  const handleFilterChange = (filter) => {
+    setActiveFilter(filter)
+    
+    if (filter === 'All') {
+      // Sort by people affected descending (default)
+      const sorted = [...problemTableData].sort((a, b) => b.peopleAffected - a.peopleAffected)
+      setFilteredProblemData(sorted)
+    } else if (filter === 'Village') {
+      // Sort by village name, but within same village, sort by people affected descending
+      const sorted = [...problemTableData].sort((a, b) => {
+        if (a.village === b.village) {
+          return b.peopleAffected - a.peopleAffected
+        }
+        return a.village.localeCompare(b.village)
+      })
+      setFilteredProblemData(sorted)
+    } else if (filter === 'Problem') {
+      // Sort by problem type, but within same problem, sort by people affected descending
+      const sorted = [...problemTableData].sort((a, b) => {
+        if (a.problem === b.problem) {
+          return b.peopleAffected - a.peopleAffected
+        }
+        return a.problem.localeCompare(b.problem)
+      })
+      setFilteredProblemData(sorted)
+    }
+  }
+
+  const handleCheckStatus = (problem) => {
+    setSelectedProblem(problem)
+    setShowModal(true)
+    // Reset form
+    setProjectDetails({
+      budget: '',
+      description: '',
+      timeline: '',
+      priority: 'Medium',
+      contactPerson: '',
+      phoneNumber: '',
+      additionalNotes: ''
+    })
+  }
+
+  const handleCloseModal = () => {
+    setShowModal(false)
+    setSelectedProblem(null)
+  }
+
+  const handleInputChange = (field, value) => {
+    setProjectDetails(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleSubmitProject = async () => {
+    try {
+      const projectData = {
+        village_id: selectedProblem.villageId,
+        name: `${selectedProblem.problem} - ${selectedProblem.village}`,
+        type: getProblemType(selectedProblem.problem),
+        progress_pct: 0,
+        status: 'planned',
+        budget: projectDetails.budget,
+        description: projectDetails.description,
+        timeline: projectDetails.timeline,
+        priority: projectDetails.priority,
+        contact_person: projectDetails.contactPerson,
+        phone_number: projectDetails.phoneNumber,
+        additional_notes: projectDetails.additionalNotes,
+        submitted_by: 'citizen' // This should come from user context
+      }
+
+      await projectAPI.createProject(projectData)
+      alert('Project details submitted successfully! An officer will review your submission.')
+      handleCloseModal()
+    } catch (error) {
+      console.error('Failed to submit project:', error)
+      alert('Failed to submit project details. Please try again.')
+    }
+  }
+
+  const getProblemType = (problemText) => {
+    if (problemText.toLowerCase().includes('water')) return 'water'
+    if (problemText.toLowerCase().includes('electricity')) return 'electricity'
+    if (problemText.toLowerCase().includes('school')) return 'education'
+    if (problemText.toLowerCase().includes('health')) return 'healthcare'
+    if (problemText.toLowerCase().includes('sanitation') || problemText.toLowerCase().includes('toilet')) return 'sanitation'
+    if (problemText.toLowerCase().includes('internet')) return 'connectivity'
+    return 'other'
   }
 
   const getStateDistribution = () => {
@@ -343,14 +566,34 @@ export default function Dashboard() {
         {/* Recent Villages Table */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Recent Villages Overview
-            </h3>
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Problems & Gaps Analysis
+              </h3>
+              <div className="flex space-x-2">
+                {['All', 'Village', 'Problem'].map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => handleFilterChange(filter)}
+                    className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                      activeFilter === filter
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Problem/Gap
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Village
                   </th>
@@ -358,53 +601,252 @@ export default function Dashboard() {
                     State
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Population
+                    People Affected ↓
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     SC Ratio
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Key Gaps
+                    Severity
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Check Status
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {villages.slice(0, 5).map((village) => (
-                  <tr key={village.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                {filteredProblemData.slice(0, 10).map((item, index) => (
+                  <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                      {village.name}
+                      {item.problem}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {village.state}
+                      {item.village}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {village.population?.toLocaleString()}
+                      {item.state}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {village.sc_ratio}%
+                      {item.peopleAffected?.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      <div className="flex space-x-1">
-                        {village.amenities?.water === 0 && (
-                          <span className="text-blue-600" title="Water">💧</span>
-                        )}
-                        {village.amenities?.electricity < 80 && (
-                          <span className="text-yellow-600" title="Electricity">⚡</span>
-                        )}
-                        {village.amenities?.schools === 0 && (
-                          <span className="text-green-600" title="Education">🎓</span>
-                        )}
-                        {village.amenities?.health_centers === 0 && (
-                          <span className="text-red-600" title="Healthcare">❤️</span>
-                        )}
-                      </div>
+                      {item.scRatio}%
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        item.severity === 'Critical' 
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                      }`}>
+                        {item.severity}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <button
+                        onClick={() => handleCheckStatus(item)}
+                        className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+                      >
+                        <Eye className="w-3 h-3 mr-1" />
+                        Check
+                      </button>
                     </td>
                   </tr>
                 ))}
+                {filteredProblemData.length === 0 && (
+                  <tr>
+                    <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                      No problems detected in the current dataset
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
+          {filteredProblemData.length > 10 && (
+            <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700 text-sm text-gray-600 dark:text-gray-400">
+              Showing 10 of {filteredProblemData.length} problems. 
+              <Link to="/gaps" className="ml-2 text-primary-600 hover:text-primary-700">
+                View all problems →
+              </Link>
+            </div>
+          )}
         </div>
+
+        {/* Problem Details Modal */}
+        {showModal && selectedProblem && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Problem Details & Project Submission
+                </h3>
+                <button
+                  onClick={handleCloseModal}
+                  className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="px-6 py-4">
+                {/* Problem Information */}
+                <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Problem Information</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">Problem:</span>
+                      <p className="text-gray-900 dark:text-white">{selectedProblem.problem}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">Village:</span>
+                      <p className="text-gray-900 dark:text-white">{selectedProblem.village}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">State:</span>
+                      <p className="text-gray-900 dark:text-white">{selectedProblem.state}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">People Affected:</span>
+                      <p className="text-gray-900 dark:text-white">{selectedProblem.peopleAffected?.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">SC Ratio:</span>
+                      <p className="text-gray-900 dark:text-white">{selectedProblem.scRatio}%</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">Severity:</span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        selectedProblem.severity === 'Critical' 
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                      }`}>
+                        {selectedProblem.severity}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Project Submission Form */}
+                <div>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-4">
+                    Submit Project Details (Citizen Input)
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Estimated Budget (₹)
+                      </label>
+                      <input
+                        type="number"
+                        value={projectDetails.budget}
+                        onChange={(e) => handleInputChange('budget', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="Enter estimated budget"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Timeline (months)
+                      </label>
+                      <input
+                        type="number"
+                        value={projectDetails.timeline}
+                        onChange={(e) => handleInputChange('timeline', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="Estimated completion time"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Contact Person
+                      </label>
+                      <input
+                        type="text"
+                        value={projectDetails.contactPerson}
+                        onChange={(e) => handleInputChange('contactPerson', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="Your name"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Phone Number
+                      </label>
+                      <input
+                        type="tel"
+                        value={projectDetails.phoneNumber}
+                        onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="Contact number"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Priority Level
+                      </label>
+                      <select
+                        value={projectDetails.priority}
+                        onChange={(e) => handleInputChange('priority', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                      >
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Critical">Critical</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Project Description
+                    </label>
+                    <textarea
+                      value={projectDetails.description}
+                      onChange={(e) => handleInputChange('description', e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="Describe the proposed solution or project details..."
+                    />
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Additional Notes
+                    </label>
+                    <textarea
+                      value={projectDetails.additionalNotes}
+                      onChange={(e) => handleInputChange('additionalNotes', e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="Any additional information or special requirements..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
+                <button
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitProject}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                  Submit to Officer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -190,6 +190,33 @@ async def get_projects():
         }
     ]
 
+@app.post("/api/projects")
+async def create_project(project: dict):
+    # Generate a new ID
+    existing_projects = await get_projects()
+    new_id = str(len(existing_projects) + 1)
+    
+    # Create project with additional citizen input fields
+    new_project = {
+        "id": new_id,
+        "village_id": project.get("village_id", "1"),
+        "name": project.get("name", "New Project"),
+        "type": project.get("type", "general"),
+        "progress_pct": project.get("progress_pct", 0.0),
+        "status": project.get("status", "planned"),
+        "budget": project.get("budget"),
+        "timeline": project.get("timeline"),
+        "priority": project.get("priority", "Medium"),
+        "contact_person": project.get("contact_person"),
+        "phone_number": project.get("phone_number"),
+        "description": project.get("description"),
+        "additional_notes": project.get("additional_notes"),
+        "submitted_by": project.get("submitted_by", "citizen"),
+        "created_at": datetime.now().isoformat()
+    }
+    
+    return {"id": new_id, "message": "Project submitted successfully", "project": new_project}
+
 @app.post("/api/reports")
 async def create_report():
     return {"id": "demo_report_1", "message": "Demo report created successfully"}
