@@ -5,6 +5,8 @@ import { OfflineProvider } from './store/OfflineContext'
 import Navbar from './components/Navbar'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import StateDashboard from './pages/StateDashboard'
+import DistrictDashboard from './pages/DistrictDashboard'
 import VillageMap from './pages/VillageMap'
 import GapDetection from './pages/GapDetection'
 import ProjectTracker from './pages/ProjectTracker'
@@ -66,7 +68,15 @@ function AppContent({ darkMode, toggleDarkMode }) {
           />
           <Route 
             path="/dashboard" 
-            element={user ? <Dashboard /> : <Navigate to="/login" />} 
+            element={
+              user
+                ? user.role === 'state'
+                  ? <StateDashboard />
+                  : user.role === 'district'
+                    ? <DistrictDashboard />
+                    : <Dashboard />
+                : <Navigate to="/login" />
+            }
           />
           <Route 
             path="/map" 

@@ -164,7 +164,7 @@ export default function ProjectTracker() {
             </p>
           </div>
           
-          {(user?.role === 'admin' || user?.role === 'field_officer') && (
+          {(user?.role === 'admin' || user?.role === 'state') && (
             <button
               onClick={() => setShowCreateForm(true)}
               className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
@@ -370,7 +370,7 @@ export default function ProjectTracker() {
                   </div>
 
                   {/* Actions */}
-                  {(user?.role === 'admin' || user?.role === 'field_officer') && (
+                  {(user?.role === 'admin' || user?.role === 'state') && (
                     <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                       <div className="flex space-x-2">
                         <button className="flex-1 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">

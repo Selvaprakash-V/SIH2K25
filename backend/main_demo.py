@@ -24,8 +24,8 @@ except:
 # Mock users for demo
 demo_users = [
     {"id": "1", "email": "admin@example.com", "name": "Admin User", "role": "admin", "password": "password"},
-    {"id": "2", "email": "officer@example.com", "name": "Field Officer", "role": "field_officer", "password": "password"},
-    {"id": "3", "email": "citizen@example.com", "name": "Citizen User", "role": "citizen", "password": "password"}
+    {"id": "2", "email": "state@example.com", "name": "State User", "role": "state", "password": "password"},
+    {"id": "3", "email": "district@example.com", "name": "District User", "role": "district", "password": "password"}
 ]
 
 @app.get("/")

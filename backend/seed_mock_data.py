@@ -33,17 +33,17 @@ async def seed_database():
             "created_at": datetime.utcnow()
         },
         {
-            "name": "Field Officer",
-            "email": "officer@example.com",
+            "name": "State User",
+            "email": "state@example.com",
             "password_hash": get_password_hash("password"),
-            "role": "field_officer",
+            "role": "state",
             "created_at": datetime.utcnow()
         },
         {
-            "name": "Citizen User",
-            "email": "citizen@example.com",
+            "name": "District User",
+            "email": "district@example.com",
             "password_hash": get_password_hash("password"),
-            "role": "citizen",
+            "role": "district",
             "created_at": datetime.utcnow()
         }
     ]

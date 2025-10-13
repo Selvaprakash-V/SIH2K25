@@ -12,7 +12,7 @@ export default function Login() {
     name: '',
     email: '',
     password: '',
-    role: 'citizen'
+  role: 'district'
   })
 
   const handleSubmit = async (e) => {
@@ -30,7 +30,7 @@ export default function Login() {
       } else if (isSignup) {
         setIsSignup(false)
         setError('')
-        setFormData({ name: '', email: '', password: '', role: 'citizen' })
+  setFormData({ name: '', email: '', password: '', role: 'district' })
       }
     } catch (err) {
       setError('An unexpected error occurred')
@@ -70,8 +70,8 @@ export default function Login() {
             </h3>
             <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
               <div><strong>Admin:</strong> admin@example.com / password</div>
-              <div><strong>Officer:</strong> officer@example.com / password</div>
-              <div><strong>Citizen:</strong> citizen@example.com / password</div>
+              <div><strong>State:</strong> state@example.com / password</div>
+              <div><strong>District:</strong> district@example.com / password</div>
             </div>
           </div>
         )}
@@ -156,8 +156,8 @@ export default function Login() {
                   onChange={handleChange}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                 >
-                  <option value="citizen">Citizen</option>
-                  <option value="field_officer">Field Officer</option>
+                  <option value="district">District</option>
+                  <option value="state">State</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
@@ -193,7 +193,7 @@ export default function Login() {
               onClick={() => {
                 setIsSignup(!isSignup)
                 setError('')
-                setFormData({ name: '', email: '', password: '', role: 'citizen' })
+                setFormData({ name: '', email: '', password: '', role: 'district' })
               }}
               className="text-primary-600 dark:text-primary-400 hover:text-primary-500 text-sm font-medium"
             >

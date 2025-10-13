@@ -136,8 +136,8 @@ async def create_village(
     village_data: VillageCreate,
     current_user: dict = Depends(get_current_user)
 ):
-    # Only admin and field officers can create villages
-    if current_user["role"] not in ["admin", "field_officer"]:
+    # Only admin and state users can create villages
+    if current_user["role"] not in ["admin", "state"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions"
@@ -287,8 +287,8 @@ async def create_project(
     project_data: ProjectCreate,
     current_user: dict = Depends(get_current_user)
 ):
-    # Only admin and field officers can create projects
-    if current_user["role"] not in ["admin", "field_officer"]:
+    # Only admin and state users can create projects
+    if current_user["role"] not in ["admin", "state"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions"

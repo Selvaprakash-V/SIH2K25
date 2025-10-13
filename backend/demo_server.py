@@ -1,3 +1,25 @@
+from fastapi import Body
+# In-memory mock projects for update
+mock_projects = [
+    {
+        "id": "1",
+        "village_id": "1",
+        "name": "School Building - Rampur",
+        "type": "education",
+        "progress_pct": 45.0,
+        "status": "in_progress",
+        "created_at": "2024-01-10T09:00:00Z"
+    },
+    {
+        "id": "2",
+        "village_id": "2",
+        "name": "Water Supply - Dholpur",
+        "type": "water",
+        "progress_pct": 20.0,
+        "status": "planned",
+        "created_at": "2024-01-15T10:00:00Z"
+    }
+]
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -80,8 +102,8 @@ mock_villages = [
 
 mock_users = [
     {"email": "admin@example.com", "password": "password", "name": "Admin User", "role": "admin"},
-    {"email": "officer@example.com", "password": "password", "name": "Field Officer", "role": "field_officer"},
-    {"email": "citizen@example.com", "password": "password", "name": "Citizen User", "role": "citizen"}
+    {"email": "state@example.com", "password": "password", "name": "State User", "role": "state"},
+    {"email": "district@example.com", "password": "password", "name": "District User", "role": "district"}
 ]
 
 # Models
@@ -169,26 +191,29 @@ async def get_gaps(village_id: Optional[str] = None):
 
 @app.get("/api/projects")
 async def get_projects():
-    return [
-        {
-            "id": "1",
-            "village_id": "1",
-            "name": "School Building - Rampur",
-            "type": "education",
-            "progress_pct": 45.0,
-            "status": "in_progress",
-            "created_at": "2024-01-10T09:00:00Z"
-        },
-        {
-            "id": "2",
-            "village_id": "2",
-            "name": "Water Supply - Dholpur",
-            "type": "water",
-            "progress_pct": 20.0,
-            "status": "planned",
-            "created_at": "2024-01-15T10:00:00Z"
-        }
-    ]
+    return mock_projects
+@app.put("/api/projects/{project_id}")
+async def update_project(project_id: str, data: dict = Body(...)):
+    for project in mock_projects:
+        if project["id"] == project_id:
+            # Only allow certain fields to be updated
+            allowed_fields = [
+                "budget", "description", "timeline", "priority", "contact_person", "phone_number", "additional_notes",
+                "progress_pct", "status"
+            ]
+            for key in allowed_fields:
+                if key in data:
+                    project[key] = data[key]
+            # Status workflow: district → pending_state, state → pending_admin, admin → approved
+            if "status" in data:
+                if data["status"] == "pending_state":
+                    project["status"] = "pending_state"
+                elif data["status"] == "pending_admin":
+                    project["status"] = "pending_admin"
+                elif data["status"] == "approved":
+                    project["status"] = "approved"
+            return {"message": "Project updated", "project": project}
+    raise HTTPException(status_code=404, detail="Project not found")
 
 @app.post("/api/projects")
 async def create_project(project: dict):
@@ -196,7 +221,7 @@ async def create_project(project: dict):
     existing_projects = await get_projects()
     new_id = str(len(existing_projects) + 1)
     
-    # Create project with additional citizen input fields
+    # Create project with additional district input fields
     new_project = {
         "id": new_id,
         "village_id": project.get("village_id", "1"),
@@ -211,7 +236,7 @@ async def create_project(project: dict):
         "phone_number": project.get("phone_number"),
         "description": project.get("description"),
         "additional_notes": project.get("additional_notes"),
-        "submitted_by": project.get("submitted_by", "citizen"),
+    "submitted_by": project.get("submitted_by", "district"),
         "created_at": datetime.now().isoformat()
     }
     

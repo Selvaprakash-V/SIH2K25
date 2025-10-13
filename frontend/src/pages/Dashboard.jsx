@@ -30,7 +30,11 @@ import {
   Cell
 } from 'recharts'
 
-export default function Dashboard() {
+import { useAuth } from '../store/AuthContext';
+
+export default function Dashboard({ role: propRole }) {
+  const { user } = useAuth ? useAuth() : { user: null };
+  const role = propRole || (user && user.role) || 'district';
   const [stats, setStats] = useState({
     totalVillages: 0,
     criticalGaps: 0,
@@ -317,14 +321,14 @@ export default function Dashboard() {
     }))
   }
 
-  const handleSubmitProject = async () => {
+  const handleSubmitProject = async (nextStatus) => {
     try {
       const projectData = {
         village_id: selectedProblem.villageId,
         name: `${selectedProblem.problem} - ${selectedProblem.village}`,
         type: getProblemType(selectedProblem.problem),
         progress_pct: 0,
-        status: 'planned',
+        status: nextStatus,
         budget: projectDetails.budget,
         description: projectDetails.description,
         timeline: projectDetails.timeline,
@@ -332,11 +336,15 @@ export default function Dashboard() {
         contact_person: projectDetails.contactPerson,
         phone_number: projectDetails.phoneNumber,
         additional_notes: projectDetails.additionalNotes,
-        submitted_by: 'citizen' // This should come from user context
+        submitted_by: role
       }
-
-      await projectAPI.createProject(projectData)
-      alert('Project details submitted successfully! An officer will review your submission.')
+      if (selectedProblem && selectedProblem.projectId) {
+        await projectAPI.updateProject(selectedProblem.projectId, projectData)
+        alert('Project updated successfully!')
+      } else {
+        await projectAPI.createProject(projectData)
+        alert('Project details submitted successfully!')
+      }
       handleCloseModal()
     } catch (error) {
       console.error('Failed to submit project:', error)
@@ -729,7 +737,7 @@ export default function Dashboard() {
                 {/* Project Submission Form */}
                 <div>
                   <h4 className="font-semibold text-gray-900 dark:text-white mb-4">
-                    Submit Project Details (Citizen Input)
+                    Submit Project Details (District Input)
                   </h4>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -837,12 +845,30 @@ export default function Dashboard() {
                 >
                   Cancel
                 </button>
-                <button
-                  onClick={handleSubmitProject}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                >
-                  Submit to Officer
-                </button>
+                {role === 'district' && (
+                  <button
+                    onClick={() => handleSubmitProject('pending_state')}
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  >
+                    Submit to State
+                  </button>
+                )}
+                {role === 'state' && (
+                  <button
+                    onClick={() => handleSubmitProject('pending_admin')}
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Approve & Send to Admin
+                  </button>
+                )}
+                {role === 'admin' && (
+                  <button
+                    onClick={() => handleSubmitProject('approved')}
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  >
+                    Approve for Work
+                  </button>
+                )}
               </div>
             </div>
           </div>

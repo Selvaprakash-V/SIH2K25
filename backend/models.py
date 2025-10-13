@@ -7,7 +7,7 @@ class UserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
-    role: str = "citizen"  # admin, field_officer, citizen
+    role: str = "district"  # admin, state, district
 
 class UserLogin(BaseModel):
     email: EmailStr
