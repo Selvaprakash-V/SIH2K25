@@ -66,8 +66,8 @@ export default function VillageMap() {
 
   const fetchVillages = async () => {
     try {
-      const response = await villageAPI.getVillages()
-      setVillages(response.data)
+  const response = await villageAPI.getVillages()
+  setVillages(response.data.villages || response.data)
     } catch (error) {
       console.error('Failed to fetch villages:', error)
     } finally {

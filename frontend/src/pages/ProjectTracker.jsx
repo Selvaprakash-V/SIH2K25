@@ -64,8 +64,8 @@ export default function ProjectTracker() {
         villageAPI.getVillages(villageParams)
       ])
       
-      setProjects(projectsRes.data)
-      setVillages(villagesRes.data)
+      setProjects(projectsRes.data.projects || projectsRes.data)
+      setVillages(villagesRes.data.villages || villagesRes.data)
     } catch (error) {
       console.error('Failed to fetch data:', error)
     } finally {

@@ -84,7 +84,7 @@ export default function Dashboard({ role: propRole }) {
         gapAPI.getGaps(gapParams)
       ])
 
-      const villageData = villagesRes.data
+      const villageData = villagesRes.data.villages || villagesRes.data
       setVillages(villageData)
 
       // Calculate stats
@@ -105,7 +105,7 @@ export default function Dashboard({ role: propRole }) {
       })
 
       // Prepare gap analysis data
-      const gaps = analyzeGaps(villageData)
+  const gaps = analyzeGaps(villageData)
       setGapData(gaps)
 
       // Generate problem table data

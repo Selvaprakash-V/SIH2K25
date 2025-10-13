@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../store/AuthContext'
 import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
+import api from '../services/api'
 
 export default function Login() {
   const { login, signup } = useAuth()
@@ -23,18 +24,16 @@ export default function Login() {
 
   // Fetch states on component mount
   useEffect(() => {
-    fetch('http://localhost:8001/api/states')
-      .then(res => res.json())
-      .then(data => setStates(data.states))
+    api.get('/states')
+      .then(res => setStates(res.data.states))
       .catch(err => console.error('Failed to fetch states:', err))
   }, [])
 
   // Fetch districts when state changes
   useEffect(() => {
     if (formData.state) {
-      fetch(`http://localhost:8001/api/districts/${formData.state}`)
-        .then(res => res.json())
-        .then(data => setDistricts(data.districts))
+      api.get(`/districts/${formData.state}`)
+        .then(res => setDistricts(res.data.districts))
         .catch(err => console.error('Failed to fetch districts:', err))
     } else {
       setDistricts([])
