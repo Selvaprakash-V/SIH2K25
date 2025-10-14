@@ -51,36 +51,39 @@ export default function Navbar() {
   const isActive = (path) => location.pathname === path
 
   return (
-    <nav className="bg-white dark:bg-gray-800 shadow-lg fixed top-0 left-0 right-0 z-40 border-b border-gray-200 dark:border-gray-700">
+    <nav className="bg-gradient-to-r from-blue-600 via-purple-600 to-orange-500 shadow-xl fixed top-0 left-0 right-0 z-40 backdrop-blur-lg bg-opacity-95">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo and Navigation */}
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Link to="/dashboard" className="flex items-center">
-                <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">RQ</span>
+              <Link to="/dashboard" className="flex items-center group">
+                <div className="h-10 w-10 relative">
+                  <div className="absolute inset-0 bg-white rounded-full group-hover:scale-110 transition-transform" />
+                  <div className="absolute inset-1 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                    <div className="h-4 w-4 bg-orange-500 rounded-full border-2 border-white" />
+                  </div>
                 </div>
-                <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">
+                <span className="ml-3 text-xl font-bold text-white drop-shadow-lg">
                   RuralIQ
                 </span>
               </Link>
             </div>
             
-            <div className="hidden md:ml-10 md:flex md:space-x-8">
+            <div className="hidden md:ml-10 md:flex md:space-x-2">
               {navigation.map((item) => {
                 const Icon = item.icon
                 return (
                   <Link
                     key={item.name}
                     to={item.href}
-                    className={`inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 transition-colors ${
+                    className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                       isActive(item.href)
-                        ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
+                        ? 'bg-white/30 backdrop-blur-md text-white shadow-lg border border-white/40'
+                        : 'text-white/80 hover:bg-white/20 hover:text-white border border-transparent hover:border-white/20'
                     }`}
                   >
-                    <Icon size={16} className="mr-1" />
+                    <Icon size={16} className="mr-2" />
                     {item.name}
                   </Link>
                 )
@@ -93,19 +96,19 @@ export default function Navbar() {
             {/* Network Status */}
             <div className="flex items-center space-x-2">
               {isOnline ? (
-                <div className="flex items-center text-green-600 dark:text-green-400">
-                  <Wifi size={16} />
-                  <span className="hidden sm:inline ml-1 text-xs">{t('navbar.online')}</span>
+                <div className="flex items-center text-white bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/30">
+                  <Wifi size={14} />
+                  <span className="hidden sm:inline ml-1.5 text-xs font-medium">{t('navbar.online')}</span>
                 </div>
               ) : (
-                <div className="flex items-center text-red-600 dark:text-red-400">
-                  <WifiOff size={16} />
-                  <span className="hidden sm:inline ml-1 text-xs">{t('navbar.offline')}</span>
+                <div className="flex items-center text-white bg-red-500/30 backdrop-blur-md px-3 py-1.5 rounded-full border border-red-400/40">
+                  <WifiOff size={14} />
+                  <span className="hidden sm:inline ml-1.5 text-xs font-medium">{t('navbar.offline')}</span>
                 </div>
               )}
               
               {pendingReports.length > 0 && (
-                <span className="bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-xs px-2 py-1 rounded-full">
+                <span className="bg-yellow-400/90 text-gray-900 text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg">
                   {pendingReports.length} {t('navbar.pending')}
                 </span>
               )}
@@ -113,21 +116,21 @@ export default function Navbar() {
 
             {/* User Menu */}
             <div className="flex items-center space-x-3">
-              <div className="hidden sm:block text-right">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
+              <div className="hidden sm:block text-right bg-white/20 backdrop-blur-md px-4 py-2 rounded-lg border border-white/30">
+                <div className="text-sm font-semibold text-white drop-shadow">
                   {user?.name}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                <div className="text-xs text-white/80 capitalize">
                   {user?.role?.replace('_', ' ')}
                 </div>
               </div>
               
               <button
                 onClick={logout}
-                className="bg-gray-100 dark:bg-gray-700 p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="bg-white/20 backdrop-blur-md p-2.5 rounded-lg text-white hover:bg-white/30 hover:shadow-lg transition-all border border-white/30"
                 title="Logout"
               >
-                <LogOut size={16} />
+                <LogOut size={18} />
               </button>
             </div>
           </div>
@@ -135,7 +138,7 @@ export default function Navbar() {
       </div>
 
       {/* Mobile Navigation */}
-      <div className="md:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+      <div className="md:hidden bg-white/10 backdrop-blur-lg border-t border-white/20">
         <div className="px-2 pt-2 pb-3 space-y-1">
           {navigation.map((item) => {
             const Icon = item.icon
@@ -143,10 +146,10 @@ export default function Navbar() {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                   isActive(item.href)
-                    ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700'
+                    ? 'bg-white/30 backdrop-blur-md text-white shadow-lg border border-white/40'
+                    : 'text-white/80 hover:bg-white/20 hover:text-white border border-transparent'
                 }`}
               >
                 <Icon size={16} className="mr-2" />
