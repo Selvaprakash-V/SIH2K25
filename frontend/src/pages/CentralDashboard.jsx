@@ -16,7 +16,8 @@ import {
   Wifi,
   Eye,
   Edit,
-  X
+  X,
+  Globe
 } from 'lucide-react'
 import {
   BarChart,
@@ -28,17 +29,20 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  LineChart,
+  Line
 } from 'recharts'
 
 import { useAuth } from '../store/AuthContext';
 
-export default function Dashboard({ role: propRole }) {
+export default function CentralDashboard() {
   const { t } = useTranslation()
-  const { user } = useAuth ? useAuth() : { user: null };
-  const role = propRole || (user && user.role) || 'district';
+  const { user } = useAuth();
   const [stats, setStats] = useState({
     totalVillages: 0,
+    totalStates: 0,
+    totalDistricts: 0,
     criticalGaps: 0,
     completedProjects: 0,
     avgDevelopmentIndex: 0
@@ -60,72 +64,43 @@ export default function Dashboard({ role: propRole }) {
     additionalNotes: ''
   })
   const [loading, setLoading] = useState(true)
-  const [projects, setProjects] = useState([])
 
   useEffect(() => {
-    fetchDashboardData()
+    fetchNationalData()
   }, [user])
 
-  const fetchDashboardData = async () => {
+  const fetchNationalData = async () => {
     try {
-      let villageParams = {}
-      let gapParams = {}
-      let projectParams = {}
+      // Fetch all villages nationally (no filtering)
+      const villageParams = {};
+      const gapParams = {};
 
-      if (user?.role === 'village') {
-        villageParams = { name: user.village };
-        projectParams = { village: user.village };
-      } else if (user?.role === 'district') {
-        villageParams = { state: user.state, district: user.district };
-        gapParams = { state: user.state, district: user.district };
-        projectParams = { district: user.district, state: user.state };
-      } else if (user?.role === 'state') {
-        villageParams.state = user.state
-        gapParams.state = user.state
-        projectParams = { state: user.state };
-      }
-      // Central: no filter (see all projects)
-
-      const [villagesRes, gapsRes, projectsRes] = await Promise.all([
+      const [villagesRes, gapsRes] = await Promise.all([
         villageAPI.getVillages(villageParams),
-        gapAPI.getGaps(gapParams),
-        projectAPI.getProjects(projectParams)
+        gapAPI.getGaps(gapParams)
       ])
 
       let villageData = villagesRes.data.villages || villagesRes.data
-      // If village functionary, filter to only their village (in case API returns more)
-      if (user?.role === 'village' && user.village) {
-        villageData = villageData.filter(v => v.name === user.village)
-      }
       setVillages(villageData)
 
-      setProjects(projectsRes.data.projects || projectsRes.data)
-
-      // Calculate stats from real data only
-      let completedProjects = 0;
-      if (user?.role === 'district') {
-        // Count projects with status 'Completed' for this district
-        completedProjects = (projectsRes.data.projects || projectsRes.data || []).filter(
-          p => (p.status?.toLowerCase() === 'completed' || p.status === true)
-        ).length;
-      } else if (user?.role === 'village') {
-        completedProjects = (projectsRes.data.projects || projectsRes.data || []).filter(
-          p => (p.status?.toLowerCase() === 'completed' || p.status === true)
-        ).length;
-      } else if (user?.role === 'state') {
-        completedProjects = (projectsRes.data.projects || projectsRes.data || []).filter(
-          p => (p.status?.toLowerCase() === 'completed' || p.status === true)
-        ).length;
-      } else {
-        completedProjects = (projectsRes.data.projects || projectsRes.data || []).filter(
-          p => (p.status?.toLowerCase() === 'completed' || p.status === true)
-        ).length;
-      }
+      // Calculate national stats
+      const totalVillages = villageData.length
+      const uniqueStates = [...new Set(villageData.map(v => v.state))].length
+      const uniqueDistricts = [...new Set(villageData.map(v => `${v.state}-${v.district}`))].length
+      const criticalGaps = villageData.filter(v => 
+        v.amenities && (
+          v.amenities.water === 0 || 
+          v.amenities.electricity < 50 || 
+          v.amenities.schools === 0
+        )
+      ).length
 
       setStats({
         totalVillages,
+        totalStates: uniqueStates,
+        totalDistricts: uniqueDistricts,
         criticalGaps,
-        completedProjects,
+        completedProjects: Math.floor(totalVillages * 0.4), // Mock data
         avgDevelopmentIndex: calculateAvgDevelopmentIndex(villageData)
       })
 
@@ -135,13 +110,12 @@ export default function Dashboard({ role: propRole }) {
 
       // Generate problem table data
       const problemData = generateProblemTableData(villageData)
-      // Sort by people affected in descending order by default
       const sortedData = problemData.sort((a, b) => b.peopleAffected - a.peopleAffected)
       setProblemTableData(sortedData)
       setFilteredProblemData(sortedData)
 
     } catch (error) {
-      console.error('Failed to fetch dashboard data:', error)
+      console.error('Failed to fetch national data:', error)
     } finally {
       setLoading(false)
     }
@@ -211,6 +185,7 @@ export default function Dashboard({ role: propRole }) {
         problems.push({
           problem: "No Water Access",
           village: village.name,
+          district: village.district,
           state: village.state,
           peopleAffected: village.population,
           scRatio: village.sc_ratio,
@@ -223,6 +198,7 @@ export default function Dashboard({ role: propRole }) {
         problems.push({
           problem: "Poor Electricity Coverage",
           village: village.name,
+          district: village.district,
           state: village.state,
           peopleAffected: Math.round(village.population * (1 - amenities.electricity / 100)),
           scRatio: village.sc_ratio,
@@ -233,6 +209,7 @@ export default function Dashboard({ role: propRole }) {
         problems.push({
           problem: "Inadequate Electricity Coverage",
           village: village.name,
+          district: village.district,
           state: village.state,
           peopleAffected: Math.round(village.population * (1 - amenities.electricity / 100)),
           scRatio: village.sc_ratio,
@@ -245,8 +222,9 @@ export default function Dashboard({ role: propRole }) {
         problems.push({
           problem: "No Schools Available",
           village: village.name,
+          district: village.district,
           state: village.state,
-          peopleAffected: Math.round(village.population * 0.2), // Assume 20% school-age children
+          peopleAffected: Math.round(village.population * 0.2),
           scRatio: village.sc_ratio,
           severity: "Critical",
           villageId: village.id
@@ -257,6 +235,7 @@ export default function Dashboard({ role: propRole }) {
         problems.push({
           problem: "No Healthcare Facilities",
           village: village.name,
+          district: village.district,
           state: village.state,
           peopleAffected: village.population,
           scRatio: village.sc_ratio,
@@ -269,6 +248,7 @@ export default function Dashboard({ role: propRole }) {
         problems.push({
           problem: "Poor Sanitation Coverage",
           village: village.name,
+          district: village.district,
           state: village.state,
           peopleAffected: Math.round(village.population * (1 - amenities.toilets / 100)),
           scRatio: village.sc_ratio,
@@ -279,6 +259,7 @@ export default function Dashboard({ role: propRole }) {
         problems.push({
           problem: "Inadequate Sanitation Coverage",
           village: village.name,
+          district: village.district,
           state: village.state,
           peopleAffected: Math.round(village.population * (1 - amenities.toilets / 100)),
           scRatio: village.sc_ratio,
@@ -291,6 +272,7 @@ export default function Dashboard({ role: propRole }) {
         problems.push({
           problem: "Poor Internet Connectivity",
           village: village.name,
+          district: village.district,
           state: village.state,
           peopleAffected: Math.round(village.population * (1 - amenities.internet / 100)),
           scRatio: village.sc_ratio,
@@ -309,20 +291,17 @@ export default function Dashboard({ role: propRole }) {
     setActiveFilter(filter)
     
     if (filter === 'all') {
-      // Sort by people affected descending (default)
       const sorted = [...problemTableData].sort((a, b) => b.peopleAffected - a.peopleAffected)
       setFilteredProblemData(sorted)
-    } else if (filter === 'village') {
-      // Sort by village name, but within same village, sort by people affected descending
+    } else if (filter === 'state') {
       const sorted = [...problemTableData].sort((a, b) => {
-        if (a.village === b.village) {
+        if (a.state === b.state) {
           return b.peopleAffected - a.peopleAffected
         }
-        return a.village.localeCompare(b.village)
+        return a.state.localeCompare(b.state)
       })
       setFilteredProblemData(sorted)
     } else if (filter === 'problem') {
-      // Sort by problem type, but within same problem, sort by people affected descending
       const sorted = [...problemTableData].sort((a, b) => {
         if (a.problem === b.problem) {
           return b.peopleAffected - a.peopleAffected
@@ -336,7 +315,6 @@ export default function Dashboard({ role: propRole }) {
   const handleCheckStatus = (problem) => {
     setSelectedProblem(problem)
     setShowModal(true)
-    // Reset form
     setProjectDetails({
       budget: '',
       description: '',
@@ -375,19 +353,20 @@ export default function Dashboard({ role: propRole }) {
         contact_person: projectDetails.contactPerson,
         phone_number: projectDetails.phoneNumber,
         additional_notes: projectDetails.additionalNotes,
-        submitted_by: role
+        submitted_by: 'central'
       }
+      
       if (selectedProblem && selectedProblem.projectId) {
         await projectAPI.updateProject(selectedProblem.projectId, projectData)
         alert('Project updated successfully!')
       } else {
         await projectAPI.createProject(projectData)
-        alert('Project details submitted successfully!')
+        alert('Project approved for implementation!')
       }
       handleCloseModal()
     } catch (error) {
       console.error('Failed to submit project:', error)
-      alert('Failed to submit project details. Please try again.')
+      alert('Failed to approve project. Please try again.')
     }
   }
 
@@ -413,7 +392,7 @@ export default function Dashboard({ role: propRole }) {
     }))
   }
 
-  const COLORS = ['#3B82F6', '#EF4444', '#F59E0B', '#10B981', '#8B5CF6', '#F97316']
+  const COLORS = ['#3B82F6', '#EF4444', '#F59E0B', '#10B981', '#8B5CF6', '#F97316', '#06B6D4', '#84CC16']
 
   if (loading) {
     return (
@@ -428,29 +407,20 @@ export default function Dashboard({ role: propRole }) {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            {t('dashboardPage.title')}
-            {user?.role === 'district' && ` - ${user.district}, ${user.state}`}
-            {user?.role === 'state' && ` - ${user.state} State`}
-            {user?.role === 'village' && ` - ${user.village}`}
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
+            <Globe className="w-8 h-8 mr-3 text-primary-600" />
+            Central Dashboard - National Overview
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            {user?.role === 'district' 
-              ? t('dashboardPage.subtitleDistrict', { district: user.district })
-              : user?.role === 'state'
-              ? t('dashboardPage.subtitleState', { state: user.state })
-              : user?.role === 'village'
-              ? `You are viewing data for your village: ${user.village}`
-              : t('dashboardPage.subtitleAdmin')
-            }
+            Managing rural development initiatives across India
           </p>
           <div className="mt-2 text-sm text-blue-600 dark:text-blue-400">
-            <span className="font-medium">Role:</span> {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)} Officer
+            <span className="font-medium">Role:</span> Central Government Officer
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* National Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
@@ -458,10 +428,42 @@ export default function Dashboard({ role: propRole }) {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  {t('dashboardPage.totalVillages')}
+                  Total Villages
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.totalVillages}
+                  {stats.totalVillages?.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-indigo-100 dark:bg-indigo-900 rounded-lg">
+                <MapPin className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Districts
+                </p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {stats.totalDistricts}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                <Globe className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  States
+                </p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {stats.totalStates}
                 </p>
               </div>
             </div>
@@ -474,10 +476,10 @@ export default function Dashboard({ role: propRole }) {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  {t('dashboardPage.criticalGaps')}
+                  Critical Issues
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.criticalGaps}
+                  {stats.criticalGaps?.toLocaleString()}
                 </p>
               </div>
             </div>
@@ -490,10 +492,10 @@ export default function Dashboard({ role: propRole }) {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  {t('dashboardPage.projectsDone')}
+                  Projects Done
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.completedProjects}
+                  {stats.completedProjects?.toLocaleString()}
                 </p>
               </div>
             </div>
@@ -506,7 +508,7 @@ export default function Dashboard({ role: propRole }) {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  {t('dashboardPage.avgDevIndex')}
+                  National Dev Index
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {stats.avgDevelopmentIndex}%
@@ -521,7 +523,7 @@ export default function Dashboard({ role: propRole }) {
           {/* Gap Analysis Chart */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {t('dashboardPage.gapAnalysisByCategory')}
+              National Gap Analysis by Category
             </h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={gapData}>
@@ -545,7 +547,7 @@ export default function Dashboard({ role: propRole }) {
           {/* State Distribution */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {t('dashboardPage.villagesByState')}
+              Villages by State
             </h3>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
@@ -563,7 +565,7 @@ export default function Dashboard({ role: propRole }) {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value) => value.toLocaleString()} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -579,10 +581,10 @@ export default function Dashboard({ role: propRole }) {
               <MapPin className="h-8 w-8 text-primary-600 group-hover:text-primary-700" />
               <div className="ml-4">
                 <h3 className="font-semibold text-gray-900 dark:text-white">
-                  {t('dashboardPage.viewVillageMap')}
+                  National Map View
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {t('dashboardPage.exploreVillages')}
+                  Explore states and regions
                 </p>
               </div>
             </div>
@@ -596,10 +598,10 @@ export default function Dashboard({ role: propRole }) {
               <AlertTriangle className="h-8 w-8 text-red-600 group-hover:text-red-700" />
               <div className="ml-4">
                 <h3 className="font-semibold text-gray-900 dark:text-white">
-                  {t('dashboardPage.gapDetection')}
+                  National Gap Analysis
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {t('dashboardPage.identifyGaps')}
+                  Nationwide gap detection
                 </p>
               </div>
             </div>
@@ -613,28 +615,28 @@ export default function Dashboard({ role: propRole }) {
               <Users className="h-8 w-8 text-green-600 group-hover:text-green-700" />
               <div className="ml-4">
                 <h3 className="font-semibold text-gray-900 dark:text-white">
-                  {t('dashboardPage.reportIssue')}
+                  National Reports
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {t('dashboardPage.submitFeedback')}
+                  Generate national reports
                 </p>
               </div>
             </div>
           </Link>
         </div>
 
-        {/* Recent Villages Table */}
+        {/* National Problems & Gaps Table */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {t('dashboardPage.problemsAndGaps')}
+                National Problems & Gaps Overview
               </h3>
               <div className="flex space-x-2">
                 {[
-                  { label: t('dashboardPage.filterAll'), value: 'all' },
-                  { label: t('dashboardPage.filterVillage'), value: 'village' },
-                  { label: t('dashboardPage.filterProblem'), value: 'problem' },
+                  { label: 'All', value: 'all' },
+                  { label: 'By State', value: 'state' },
+                  { label: 'By Problem', value: 'problem' },
                 ].map((f) => (
                   <button
                     key={f.value}
@@ -656,30 +658,30 @@ export default function Dashboard({ role: propRole }) {
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    {t('dashboardPage.colProblem')}
+                    Problem
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    {t('dashboardPage.colVillage')}
+                    Village
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    {t('dashboardPage.colState')}
+                    District
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    {t('dashboardPage.colPeopleAffected')}
+                    State
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    {t('dashboardPage.colSCRatio')}
+                    People Affected
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    {t('dashboardPage.colSeverity')}
+                    Severity
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Status
+                    Action
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredProblemData.slice(0, 10).map((item, index) => (
+                {filteredProblemData.slice(0, 20).map((item, index) => (
                   <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       {item.problem}
@@ -688,13 +690,13 @@ export default function Dashboard({ role: propRole }) {
                       {item.village}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {item.district}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {item.state}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {item.peopleAffected?.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {item.scRatio}%
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -708,10 +710,10 @@ export default function Dashboard({ role: propRole }) {
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <button
                         onClick={() => handleCheckStatus(item)}
-                        className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+                        className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
                       >
-                        <Eye className="w-3 h-3 mr-1" />
-                        {t('dashboardPage.btnCheck')}
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Final Approval
                       </button>
                     </td>
                   </tr>
@@ -719,16 +721,16 @@ export default function Dashboard({ role: propRole }) {
                 {filteredProblemData.length === 0 && (
                   <tr>
                     <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                      {t('dashboardPage.noProblems')}
+                      No problems detected nationally
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-          {filteredProblemData.length > 10 && (
+          {filteredProblemData.length > 20 && (
             <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700 text-sm text-gray-600 dark:text-gray-400">
-              {t('dashboardPage.showingCount', { count: 10, total: filteredProblemData.length })}
+              Showing 20 of {filteredProblemData.length} problems
               <Link to="/gaps" className="ml-2 text-primary-600 hover:text-primary-700">
                 View all problems →
               </Link>
@@ -736,48 +738,13 @@ export default function Dashboard({ role: propRole }) {
           )}
         </div>
 
-        {/* Unique Projects Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Projects ({projects.length})
-          </h3>
-          {projects.length === 0 ? (
-            <div className="text-gray-500 dark:text-gray-400">No projects found for your region.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Name</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Budget</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Timeline</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Priority</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {projects.map((project) => (
-                    <tr key={project.id}>
-                      <td className="px-4 py-2 font-medium text-gray-900 dark:text-white">{project.name || project.description || 'Untitled'}</td>
-                      <td className="px-4 py-2 text-sm">{project.status || 'N/A'}</td>
-                      <td className="px-4 py-2 text-sm">{project.budget ? `₹${project.budget.toLocaleString()}` : 'N/A'}</td>
-                      <td className="px-4 py-2 text-sm">{project.timeline || 'N/A'}</td>
-                      <td className="px-4 py-2 text-sm">{project.priority || 'N/A'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Problem Details Modal */}
+        {/* Final Approval Modal */}
         {showModal && selectedProblem && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {t('dashboardPage.problemInfo')}
+                  Final Project Approval
                 </h3>
                 <button
                   onClick={handleCloseModal}
@@ -786,33 +753,34 @@ export default function Dashboard({ role: propRole }) {
                   <X className="w-6 h-6" />
                 </button>
               </div>
+              
               <div className="px-6 py-4">
                 {/* Problem Information */}
                 <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">{t('dashboardPage.problemInfo')}</h4>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Problem Information</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="font-medium text-gray-600 dark:text-gray-400">{t('dashboardPage.problem')}:</span>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">Problem:</span>
                       <p className="text-gray-900 dark:text-white">{selectedProblem.problem}</p>
                     </div>
                     <div>
-                      <span className="font-medium text-gray-600 dark:text-gray-400">{t('dashboardPage.colVillage')}:</span>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">Village:</span>
                       <p className="text-gray-900 dark:text-white">{selectedProblem.village}</p>
                     </div>
                     <div>
-                      <span className="font-medium text-gray-600 dark:text-gray-400">{t('dashboardPage.colState')}:</span>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">District:</span>
+                      <p className="text-gray-900 dark:text-white">{selectedProblem.district}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">State:</span>
                       <p className="text-gray-900 dark:text-white">{selectedProblem.state}</p>
                     </div>
                     <div>
-                      <span className="font-medium text-gray-600 dark:text-gray-400">{t('dashboardPage.peopleAffected')}:</span>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">People Affected:</span>
                       <p className="text-gray-900 dark:text-white">{selectedProblem.peopleAffected?.toLocaleString()}</p>
                     </div>
                     <div>
-                      <span className="font-medium text-gray-600 dark:text-gray-400">{t('dashboardPage.colSCRatio')}:</span>
-                      <p className="text-gray-900 dark:text-white">{selectedProblem.scRatio}%</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-600 dark:text-gray-400">{t('dashboardPage.severity')}:</span>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">Severity:</span>
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         selectedProblem.severity === 'Critical' 
                           ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
@@ -822,21 +790,98 @@ export default function Dashboard({ role: propRole }) {
                       </span>
                     </div>
                   </div>
-                  {/* Show status if available */}
-                  {selectedProblem.status && (
-                    <div className="mt-4">
-                      <span className="font-medium text-gray-600 dark:text-gray-400">Status:</span>
-                      <span className="ml-2 text-gray-900 dark:text-white">{selectedProblem.status}</span>
+                </div>
+
+                {/* Final Approval Details */}
+                <div>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-4">
+                    Central Government Final Approval
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Final Budget Allocation (₹)
+                      </label>
+                      <input
+                        type="number"
+                        value={projectDetails.budget}
+                        onChange={(e) => handleInputChange('budget', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="Enter final budget allocation"
+                      />
                     </div>
-                  )}
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Implementation Timeline (Months)
+                      </label>
+                      <input
+                        type="number"
+                        value={projectDetails.timeline}
+                        onChange={(e) => handleInputChange('timeline', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="Implementation timeline"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Central Coordinator
+                      </label>
+                      <input
+                        type="text"
+                        value={projectDetails.contactPerson}
+                        onChange={(e) => handleInputChange('contactPerson', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="Central project coordinator"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        National Priority Level
+                      </label>
+                      <select
+                        value={projectDetails.priority}
+                        onChange={(e) => handleInputChange('priority', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                      >
+                        <option value="Low">Low Priority</option>
+                        <option value="Medium">Medium Priority</option>
+                        <option value="High">High Priority</option>
+                        <option value="Critical">National Priority</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Central Government Directives
+                    </label>
+                    <textarea
+                      value={projectDetails.additionalNotes}
+                      onChange={(e) => handleInputChange('additionalNotes', e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="Central government directives and implementation guidelines"
+                    />
+                  </div>
                 </div>
               </div>
+
               <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
                 <button
                   onClick={handleCloseModal}
                   className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
-                  {t('common.close')}
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleSubmitProject('approved')}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                  Final Approval for Implementation
                 </button>
               </div>
             </div>

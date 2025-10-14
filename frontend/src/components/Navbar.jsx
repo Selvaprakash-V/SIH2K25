@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../store/AuthContext'
 import { useOffline } from '../store/OfflineContext'
@@ -14,17 +15,38 @@ import {
 } from 'lucide-react'
 
 export default function Navbar() {
+  const { t } = useTranslation()
   const { user, logout } = useAuth()
   const { isOnline, pendingReports } = useOffline()
   const location = useLocation()
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Map View', href: '/map', icon: Map },
-    { name: 'Gap Detection', href: '/gaps', icon: AlertTriangle },
-    { name: 'Projects', href: '/projects', icon: Briefcase },
-    { name: 'Report Issue', href: '/report', icon: FileText },
-  ]
+  // Role-based navigation
+  const getNavigation = () => {
+    const baseNavigation = [
+      { name: t('navbar.dashboard'), href: '/dashboard', icon: LayoutDashboard },
+    ]
+
+    // Village functionaries get different navigation
+    if (user?.role === 'village') {
+      return [
+        ...baseNavigation,
+        { name: t('navbar.gapDetection'), href: '/gaps', icon: AlertTriangle },
+        { name: t('navbar.projects'), href: '/projects', icon: Briefcase },
+        { name: 'Upload Village Data', href: '/report', icon: FileText },
+      ]
+    }
+
+    // District, State, and Central get full navigation
+    return [
+      ...baseNavigation,
+      { name: t('navbar.mapView'), href: '/map', icon: Map },
+      { name: t('navbar.gapDetection'), href: '/gaps', icon: AlertTriangle },
+      { name: t('navbar.projects'), href: '/projects', icon: Briefcase },
+      { name: t('navbar.reportIssue'), href: '/report', icon: FileText },
+    ]
+  }
+
+  const navigation = getNavigation()
 
   const isActive = (path) => location.pathname === path
 
@@ -73,18 +95,18 @@ export default function Navbar() {
               {isOnline ? (
                 <div className="flex items-center text-green-600 dark:text-green-400">
                   <Wifi size={16} />
-                  <span className="hidden sm:inline ml-1 text-xs">Online</span>
+                  <span className="hidden sm:inline ml-1 text-xs">{t('navbar.online')}</span>
                 </div>
               ) : (
                 <div className="flex items-center text-red-600 dark:text-red-400">
                   <WifiOff size={16} />
-                  <span className="hidden sm:inline ml-1 text-xs">Offline</span>
+                  <span className="hidden sm:inline ml-1 text-xs">{t('navbar.offline')}</span>
                 </div>
               )}
               
               {pendingReports.length > 0 && (
                 <span className="bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-xs px-2 py-1 rounded-full">
-                  {pendingReports.length} pending
+                  {pendingReports.length} {t('navbar.pending')}
                 </span>
               )}
             </div>

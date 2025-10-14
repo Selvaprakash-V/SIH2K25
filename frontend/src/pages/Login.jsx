@@ -1,303 +1,240 @@
-import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../store/AuthContext'
-import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
-import api from '../services/api'
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../store/AuthContext';
+import { useLang } from '../store/LangContext';
+import api from '../services/api';
+
+// Role options for the new login
+const ROLES = [
+  { value: 'village', label: 'Village Functionary' },
+  { value: 'district', label: 'District Officer' },
+  { value: 'state', label: 'State Officer' },
+  { value: 'central', label: 'Central Government Officer' },
+];
 
 export default function Login() {
-  const { login, signup } = useAuth()
-  const navigate = useNavigate()
-  const [isSignup, setIsSignup] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [states, setStates] = useState([])
-  const [districts, setDistricts] = useState([])
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    role: 'district',
+  const { updateUser } = useAuth();
+  const { lang, setLang, t } = useLang();
+  const navigate = useNavigate();
+  const [states, setStates] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [villages, setVillages] = useState([]);
+  const [form, setForm] = useState({
+    role: '',
+    language: lang,
     state: '',
-    district: ''
-  })
+    district: '',
+    village: '',
+  });
 
-  // Fetch states on component mount
+  // Fetch states on mount
   useEffect(() => {
     api.get('/states')
-      .then(res => setStates(res.data.states))
-      .catch(err => console.error('Failed to fetch states:', err))
-  }, [])
+      .then(res => setStates(res.data.states || []))
+      .catch(() => setStates([]));
+  }, []);
 
   // Fetch districts when state changes
   useEffect(() => {
-    if (formData.state) {
-      api.get(`/districts/${formData.state}`)
-        .then(res => setDistricts(res.data.districts))
-        .catch(err => console.error('Failed to fetch districts:', err))
+    if (form.state) {
+      api.get(`/districts/${form.state}`)
+        .then(res => setDistricts(res.data.districts || []))
+        .catch(() => setDistricts([]));
     } else {
-      setDistricts([])
+      setDistricts([]);
     }
-  }, [formData.state])
+    setForm(f => ({ ...f, district: '', village: '' }));
+  }, [form.state]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    try {
-      const result = isSignup 
-        ? await signup(formData)
-        : await login({ email: formData.email, password: formData.password })
-
-      if (!result.success) {
-        setError(result.error)
-      } else if (isSignup) {
-        setIsSignup(false)
-        setError('')
-        setFormData({ name: '', email: '', password: '', role: 'district', state: '', district: '' })
-      } else {
-        // Successful login - navigate to dashboard
-        navigate('/dashboard')
-      }
-    } catch (err) {
-      setError('An unexpected error occurred')
+  // Fetch villages from MongoDB for login selection
+  useEffect(() => {
+    if (form.role === 'village') {
+      // Fetch all villages from the database
+      api.get('/villages')
+        .then(res => setVillages(res.data.villages || res.data || []))
+        .catch(() => setVillages([]));
+      setForm(f => ({ ...f, village: '' }));
+    } else if (form.district) {
+      // Fetch villages for selected district
+      api.get(`/villages?state=${form.state}&district=${form.district}`)
+        .then(res => setVillages(res.data.villages || res.data || []))
+        .catch(() => setVillages([]));
+      setForm(f => ({ ...f, village: '' }));
+    } else {
+      setVillages([]);
+      setForm(f => ({ ...f, village: '' }));
     }
+  }, [form.role, form.district, form.state]);
 
-    setLoading(false)
-  }
-
+  // Handle form changes
   const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-      // Reset district when state changes
-      ...(name === 'state' ? { district: '' } : {})
-    }))
-  }
+    const { name, value } = e.target;
+    setForm(f => ({ ...f, [name]: value }));
+    if (name === 'role') {
+      setForm(f => ({ ...f, state: '', district: '', village: '' }));
+    }
+    if (name === 'language') {
+      setLang(value);
+    }
+  };
+
+  // Handle login (no credentials, just set user context)
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    // For village functionaries, auto-populate district and state from selected village
+    let finalState = form.state;
+    let finalDistrict = form.district;
+    
+    if (form.role === 'village' && form.village) {
+      const selectedVillageData = villages.find(v => v.name === form.village);
+      if (selectedVillageData) {
+        finalState = selectedVillageData.state;
+        finalDistrict = selectedVillageData.district;
+      }
+    }
+    
+    // Compose user object for context
+    const user = {
+      role: form.role,
+      language: form.language,
+      state: finalState,
+      district: finalDistrict,
+      village: form.village,
+      name: form.role ? ROLES.find(r => r.value === form.role)?.label : '',
+    };
+    updateUser(user);
+    navigate('/dashboard');
+  };
+
+  // Region selection logic based on role
+  const showState = [
+    'district', 'state', 'central'
+  ].includes(form.role);
+  const showDistrict = ['district'].includes(form.role);
+  const showVillage = form.role === 'village';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        {/* Header */}
         <div className="text-center">
           <div className="mx-auto h-16 w-16 bg-primary-600 rounded-full flex items-center justify-center mb-4">
             <span className="text-white font-bold text-2xl">RQ</span>
           </div>
           <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">
-            {isSignup ? 'Create Account' : 'Sign in to RuralIQ'}
+            Select Role, Language & Region
           </h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Smart village gap detection and monitoring
+            Please choose your role and region to proceed.
           </p>
         </div>
-
-        {/* Demo Credentials */}
-        {!isSignup && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-              SCA Scheme Demo Credentials:
-            </h3>
-            <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-              <div><strong>Admin:</strong> admin@example.com / password</div>
-              <div><strong>Sikkim State:</strong> sikkim.state@gov.in / password</div>
-              <div><strong>East Sikkim:</strong> east.sikkim@gov.in / password</div>
-              <div><strong>West Sikkim:</strong> west.sikkim@gov.in / password</div>
-              <div><strong>North Sikkim:</strong> north.sikkim@gov.in / password</div>
-              <div><strong>South Sikkim:</strong> south.sikkim@gov.in / password</div>
-            </div>
-          </div>
-        )}
-
-        {/* Clear Session Button */}
-        {!isSignup && (
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => {
-                localStorage.clear()
-                window.location.reload()
-              }}
-              className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-            >
-              Clear Session & Start Fresh
-            </button>
-          </div>
-        )}
-
-        {/* Form */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
-            {isSignup && (
+            {/* Role */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
+              <select
+                name="role"
+                value={form.role}
+                onChange={handleChange}
+                required
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+              >
+                <option value="">Select Role</option>
+                {ROLES.map(r => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+            {/* Language */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Language</label>
+              <select
+                name="language"
+                value={form.language}
+                onChange={handleChange}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+              >
+                <option value="en">English</option>
+                <option value="hi">हिंदी (Hindi)</option>
+                <option value="ta">தமிழ் (Tamil)</option>
+                <option value="te">తెలుగు (Telugu)</option>
+                <option value="bn">বাংলা (Bengali)</option>
+                <option value="mr">मराठी (Marathi)</option>
+                <option value="ml">മലയാളം (Malayalam)</option>
+                <option value="kn">ಕನ್ನಡ (Kannada)</option>
+                <option value="gu">ગુજરાતી (Gujarati)</option>
+                <option value="pa">ਪੰਜਾਬੀ (Punjabi)</option>
+                <option value="or">ଓଡ଼ିଆ (Odia)</option>
+                <option value="as">অসমীয়া (Assamese)</option>
+              </select>
+            </div>
+            {/* State */}
+            {showState && (
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Full Name
-                </label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  value={formData.name}
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">State</label>
+                <select
+                  name="state"
+                  value={form.state}
                   onChange={handleChange}
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                  placeholder="Enter your full name"
-                />
+                  required
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                >
+                  <option value="">Select State</option>
+                  {states.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
               </div>
             )}
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Email Address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                placeholder="Enter your email"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Password
-              </label>
-              <div className="mt-1 relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete={isSignup ? "new-password" : "current-password"}
-                  required
-                  value={formData.password}
+            {/* District */}
+            {showDistrict && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">District</label>
+                <select
+                  name="district"
+                  value={form.district}
                   onChange={handleChange}
-                  className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                  placeholder="Enter your password"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
+                  required
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-400" />
-                  )}
-                </button>
+                  <option value="">Select District</option>
+                  {districts.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
               </div>
-            </div>
-
-            {isSignup && (
-              <>
-                <div>
-                  <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Role
-                  </label>
-                  <select
-                    id="role"
-                    name="role"
-                    value={formData.role}
-                    onChange={handleChange}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  >
-                    <option value="district">District Officer</option>
-                    <option value="state">State Officer</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-
-                {(formData.role === 'state' || formData.role === 'district') && (
-                  <div>
-                    <label htmlFor="state" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      State
-                    </label>
-                    <select
-                      id="state"
-                      name="state"
-                      value={formData.state}
-                      onChange={handleChange}
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    >
-                      <option value="">Select State</option>
-                      {states.map(state => (
-                        <option key={state} value={state}>{state}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {formData.role === 'district' && formData.state && (
-                  <div>
-                    <label htmlFor="district" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      District
-                    </label>
-                    <select
-                      id="district"
-                      name="district"
-                      value={formData.district}
-                      onChange={handleChange}
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    >
-                      <option value="">Select District</option>
-                      {districts.map(district => (
-                        <option key={district} value={district}>{district}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </>
+            )}
+            {/* Village */}
+            {showVillage && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Village</label>
+                <select
+                  name="village"
+                  value={form.village}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                >
+                  <option value="">Select Village</option>
+                  {villages.map(v => (
+                    <option key={v.id || v} value={v.name || v}>{v.name || v}</option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
-
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
-              {error}
-            </div>
-          )}
-
           <div>
             <button
               type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+              disabled={!form.role || (showState && !form.state) || (showDistrict && !form.district) || (showVillage && !form.village)}
             >
-              {loading ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              ) : (
-                <>
-                  {isSignup ? <UserPlus className="mr-2 h-4 w-4" /> : <LogIn className="mr-2 h-4 w-4" />}
-                  {isSignup ? 'Create Account' : 'Sign In'}
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignup(!isSignup)
-                setError('')
-                setFormData({ name: '', email: '', password: '', role: 'district', state: '', district: '' })
-              }}
-              className="text-primary-600 dark:text-primary-400 hover:text-primary-500 text-sm font-medium"
-            >
-              {isSignup 
-                ? 'Already have an account? Sign in' 
-                : "Don't have an account? Sign up"}
+              Continue
             </button>
           </div>
         </form>
       </div>
     </div>
-  )
+  );
 }

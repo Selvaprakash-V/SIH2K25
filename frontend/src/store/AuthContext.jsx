@@ -86,11 +86,20 @@ export function AuthProvider({ children }) {
     setIsNewSession(true)
   }
 
+  const updateUser = (partial) => {
+    setUser(prev => {
+      const next = { ...(prev || {}), ...partial }
+      localStorage.setItem('user', JSON.stringify(next))
+      return next
+    })
+  }
+
   const value = {
     user,
     login,
     signup,
     logout,
+    updateUser,
     loading,
     isNewSession
   }

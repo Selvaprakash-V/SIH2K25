@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { villageAPI, gapAPI } from '../services/api'
+import { useAuth } from '../store/AuthContext'
 import { AlertTriangle, TrendingDown, Search, Filter, ExternalLink } from 'lucide-react'
 
 export default function GapDetection() {
+  const { user } = useAuth()
   const [villages, setVillages] = useState([])
   const [gaps, setGaps] = useState([])
   const [loading, setLoading] = useState(true)
@@ -12,19 +14,34 @@ export default function GapDetection() {
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [user])
 
   const fetchData = async () => {
     try {
+      // Filter data based on user role
+      const params = {}
+      if (user?.role === 'village' && user?.village) {
+        params.name = user.village
+        params.state = user.state
+        params.district = user.district
+      } else if (user?.role === 'district' && user?.district) {
+        params.district = user.district
+        params.state = user.state
+      } else if (user?.role === 'state' && user?.state) {
+        params.state = user.state
+      }
+      // Central users see all data (no filtering)
+
       const [villagesRes, gapsRes] = await Promise.all([
-        villageAPI.getVillages(),
-        gapAPI.getGaps()
+        villageAPI.getVillages(params),
+        gapAPI.getGaps(params)
       ])
       
-      setVillages(villagesRes.data)
+      setVillages(villagesRes.data.villages || villagesRes.data)
       
       // Process gap data
-      const processedGaps = villagesRes.data.map(village => {
+      const villageData = villagesRes.data.villages || villagesRes.data
+      const processedGaps = villageData.map(village => {
         return analyzeVillageGaps(village)
       }).filter(gap => gap.gaps.length > 0)
       
@@ -192,6 +209,82 @@ export default function GapDetection() {
   }
 
   const filteredGaps = getFilteredGaps()
+
+  // For village users, show only their own village and hide filters
+  if (user?.role === 'village') {
+    const myVillageGap = gaps.find(gap => gap.village.name === user.village)
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+        <div className="max-w-3xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              Gap Detection for {user.village}
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Infrastructure gaps and priorities for your village
+            </p>
+          </div>
+          {myVillageGap ? (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      {myVillageGap.village.name}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {myVillageGap.village.district}, {myVillageGap.village.state} •
+                      Population: {myVillageGap.village.population?.toLocaleString()} •
+                      SC Ratio: {myVillageGap.village.sc_ratio}%
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-red-600">
+                      {myVillageGap.severityScore}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Severity Score
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  {myVillageGap.gaps.length === 0 ? (
+                    <div className="text-green-600 font-semibold">No major gaps detected. Your village is meeting its development targets.</div>
+                  ) : (
+                    myVillageGap.gaps.map((gap, index) => (
+                      <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <div className="flex items-start space-x-3">
+                          <span className="text-2xl">{getGapTypeIcon(gap.type)}</span>
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <h4 className="font-semibold text-gray-900 dark:text-white capitalize">{gap.type}</h4>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSeverityColor(gap.severity)}`}>{gap.severity}</span>
+                            </div>
+                            <div className="text-gray-700 dark:text-gray-300 text-sm mb-1">{gap.message}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Impact: {gap.impact}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
+              <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                No data found for your village
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Please contact your district or state officer to ensure your village data is up to date.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">

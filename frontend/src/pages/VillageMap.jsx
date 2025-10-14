@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import { villageAPI } from '../services/api'
+import { useAuth } from '../store/AuthContext'
 import { Filter, Search, MapPin, Users, AlertTriangle } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -53,6 +54,7 @@ function MapController({ villages, selectedState, selectedDistrict }) {
 }
 
 export default function VillageMap() {
+  const { user } = useAuth()
   const [villages, setVillages] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedState, setSelectedState] = useState('')
@@ -62,12 +64,26 @@ export default function VillageMap() {
 
   useEffect(() => {
     fetchVillages()
-  }, [])
+  }, [user])
 
   const fetchVillages = async () => {
     try {
-  const response = await villageAPI.getVillages()
-  setVillages(response.data.villages || response.data)
+      // Filter data based on user role
+      const params = {}
+      if (user?.role === 'village' && user?.village) {
+        params.name = user.village
+        params.state = user.state
+        params.district = user.district
+      } else if (user?.role === 'district' && user?.district) {
+        params.district = user.district
+        params.state = user.state
+      } else if (user?.role === 'state' && user?.state) {
+        params.state = user.state
+      }
+      // Central users see all data (no filtering)
+
+      const response = await villageAPI.getVillages(params)
+      setVillages(response.data.villages || response.data)
     } catch (error) {
       console.error('Failed to fetch villages:', error)
     } finally {

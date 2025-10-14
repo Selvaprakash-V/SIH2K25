@@ -26,3 +26,6 @@ cloudinary==1.44.1
 # Explicit pydantic v2 (FastAPI uses v2 APIs in our code)
 pydantic==2.9.2
 pydantic-core==2.23.4
+
+# Pin bcrypt due to passlib compatibility on Windows
+bcrypt==3.2.2

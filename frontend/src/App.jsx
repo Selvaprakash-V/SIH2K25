@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './store/AuthContext'
 import { OfflineProvider } from './store/OfflineContext'
+import { LangProvider } from './store/LangContext'
 import Navbar from './components/Navbar'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import StateDashboard from './pages/StateDashboard'
 import DistrictDashboard from './pages/DistrictDashboard'
+import VillageDashboard from './pages/VillageDashboard'
+import CentralDashboard from './pages/CentralDashboard'
 import VillageMap from './pages/VillageMap'
 import GapDetection from './pages/GapDetection'
 import ProjectTracker from './pages/ProjectTracker'
@@ -42,13 +45,15 @@ function App() {
 
   return (
     <AuthProvider>
-      <OfflineProvider>
-        <Router>
-          <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors`}>
-            <AppContent darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
-          </div>
-        </Router>
-      </OfflineProvider>
+      <LangProvider>
+        <OfflineProvider>
+          <Router>
+            <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors`}>
+              <AppContent darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
+            </div>
+          </Router>
+        </OfflineProvider>
+      </LangProvider>
     </AuthProvider>
   )
 }
@@ -72,14 +77,11 @@ function AppContent({ darkMode, toggleDarkMode }) {
             path="/dashboard" 
             element={
               user ? (
-                <div>
-                  <h1>Dashboard Loading...</h1>
-                  <p>User: {user.name}</p>
-                  <p>Role: {user.role}</p>
-                  {user.role === 'state' ? <StateDashboard /> : 
-                   user.role === 'district' ? <DistrictDashboard /> : 
-                   <Dashboard />}
-                </div>
+                user.role === 'village' ? <VillageDashboard /> :
+                user.role === 'district' ? <DistrictDashboard /> :
+                user.role === 'state' ? <StateDashboard /> :
+                user.role === 'central' ? <CentralDashboard /> :
+                <Dashboard />
               ) : <Navigate to="/login" />
             }
           />

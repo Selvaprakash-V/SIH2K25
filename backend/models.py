@@ -94,12 +94,11 @@ class ProjectType(str, Enum):
 class ProjectCreate(BaseModel):
     village_id: str
     name: str
-    type: ProjectType
+    type: str  # education, healthcare, water, electricity, etc.
     description: str
     estimated_cost: float
     estimated_duration_months: int
     priority: str = "medium"  # low, medium, high, critical
-    created_by_district: str  # District name
 
 class ProjectUpdate(BaseModel):
     progress_pct: Optional[float] = None
@@ -115,18 +114,17 @@ class ProjectApproval(BaseModel):
 class ProjectResponse(BaseModel):
     id: str
     village_id: str
-    village_name: str
-    district: str
     name: str
     type: str
-    description: str
-    estimated_cost: float
-    estimated_duration_months: int
-    priority: str
+    description: Optional[str] = ""
+    estimated_cost: Optional[float] = 0
+    estimated_duration_months: Optional[int] = 6
+    priority: Optional[str] = "medium"
     status: str
     progress_pct: float
-    created_by_district: str
-    created_at: datetime
+    created_by: Optional[str] = ""
+    created_by_district: Optional[str] = ""
+    created_at: Optional[datetime] = None
     approved_by: Optional[str] = None
     approved_at: Optional[datetime] = None
     approval_notes: Optional[str] = None

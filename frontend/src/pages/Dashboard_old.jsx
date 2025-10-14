@@ -33,63 +33,42 @@ import {
 
 import { useAuth } from '../store/AuthContext';
 
+import VillageDashboard from './VillageDashboard';
+import DistrictDashboard from './DistrictDashboard';
+
 export default function Dashboard({ role: propRole }) {
-  const { t } = useTranslation()
   const { user } = useAuth ? useAuth() : { user: null };
   const role = propRole || (user && user.role) || 'district';
-  const [stats, setStats] = useState({
-    totalVillages: 0,
-    criticalGaps: 0,
-    completedProjects: 0,
-    avgDevelopmentIndex: 0
-  })
-  const [villages, setVillages] = useState([])
-  const [gapData, setGapData] = useState([])
-  const [problemTableData, setProblemTableData] = useState([])
-  const [filteredProblemData, setFilteredProblemData] = useState([])
-  const [activeFilter, setActiveFilter] = useState('all')
-  const [selectedProblem, setSelectedProblem] = useState(null)
-  const [showModal, setShowModal] = useState(false)
-  const [projectDetails, setProjectDetails] = useState({
-    budget: '',
-    description: '',
-    timeline: '',
-    priority: 'Medium',
-    contactPerson: '',
-    phoneNumber: '',
-    additionalNotes: ''
-  })
-  const [loading, setLoading] = useState(true)
-  const [projects, setProjects] = useState([])
 
-  useEffect(() => {
-    fetchDashboardData()
-  }, [user])
+  if (role === 'village') {
+    return <VillageDashboard />;
+  }
+  if (role === 'district') {
+    return <DistrictDashboard />;
+  }
+  // You can add StateDashboard, AdminDashboard, etc. as needed
+  return <div>Unsupported role</div>;
+}
 
-  const fetchDashboardData = async () => {
     try {
       let villageParams = {}
       let gapParams = {}
-      let projectParams = {}
 
       if (user?.role === 'village') {
+        // Only fetch the selected village
         villageParams = { name: user.village };
-        projectParams = { village: user.village };
       } else if (user?.role === 'district') {
+        // Fetch all villages in the district
         villageParams = { state: user.state, district: user.district };
         gapParams = { state: user.state, district: user.district };
-        projectParams = { district: user.district, state: user.state };
       } else if (user?.role === 'state') {
         villageParams.state = user.state
         gapParams.state = user.state
-        projectParams = { state: user.state };
       }
-      // Central: no filter (see all projects)
 
-      const [villagesRes, gapsRes, projectsRes] = await Promise.all([
+      const [villagesRes, gapsRes] = await Promise.all([
         villageAPI.getVillages(villageParams),
-        gapAPI.getGaps(gapParams),
-        projectAPI.getProjects(projectParams)
+        gapAPI.getGaps(gapParams)
       ])
 
       let villageData = villagesRes.data.villages || villagesRes.data
@@ -99,33 +78,20 @@ export default function Dashboard({ role: propRole }) {
       }
       setVillages(villageData)
 
-      setProjects(projectsRes.data.projects || projectsRes.data)
-
-      // Calculate stats from real data only
-      let completedProjects = 0;
-      if (user?.role === 'district') {
-        // Count projects with status 'Completed' for this district
-        completedProjects = (projectsRes.data.projects || projectsRes.data || []).filter(
-          p => (p.status?.toLowerCase() === 'completed' || p.status === true)
-        ).length;
-      } else if (user?.role === 'village') {
-        completedProjects = (projectsRes.data.projects || projectsRes.data || []).filter(
-          p => (p.status?.toLowerCase() === 'completed' || p.status === true)
-        ).length;
-      } else if (user?.role === 'state') {
-        completedProjects = (projectsRes.data.projects || projectsRes.data || []).filter(
-          p => (p.status?.toLowerCase() === 'completed' || p.status === true)
-        ).length;
-      } else {
-        completedProjects = (projectsRes.data.projects || projectsRes.data || []).filter(
-          p => (p.status?.toLowerCase() === 'completed' || p.status === true)
-        ).length;
-      }
+      // Calculate stats
+      const totalVillages = villageData.length
+      const criticalGaps = villageData.filter(v => 
+        v.amenities && (
+          v.amenities.water === 0 || 
+          v.amenities.electricity < 50 || 
+          v.amenities.schools === 0
+        )
+      ).length
 
       setStats({
         totalVillages,
         criticalGaps,
-        completedProjects,
+        completedProjects: Math.floor(totalVillages * 0.3), // Mock data
         avgDevelopmentIndex: calculateAvgDevelopmentIndex(villageData)
       })
 
@@ -141,58 +107,11 @@ export default function Dashboard({ role: propRole }) {
       setFilteredProblemData(sortedData)
 
     } catch (error) {
-      console.error('Failed to fetch dashboard data:', error)
-    } finally {
-      setLoading(false)
+      // ...existing code...
     }
   }
+// ...existing code...
 
-  const calculateAvgDevelopmentIndex = (villages) => {
-    if (villages.length === 0) return 0
-    
-    const total = villages.reduce((sum, village) => {
-      if (!village.amenities) return sum
-      
-      const amenities = village.amenities
-      const score = (
-        (amenities.water * 25) +
-        (amenities.electricity * 0.2) +
-        (amenities.schools > 0 ? 15 : 0) +
-        (amenities.health_centers > 0 ? 20 : 0) +
-        (amenities.toilets * 0.15) +
-        (amenities.internet * 0.05)
-      )
-      
-      return sum + Math.min(100, score)
-    }, 0)
-    
-    return Math.round(total / villages.length)
-  }
-
-  const analyzeGaps = (villages) => {
-    const gaps = {
-      water: 0,
-      electricity: 0,
-      education: 0,
-      healthcare: 0,
-      sanitation: 0,
-      connectivity: 0
-    }
-
-    villages.forEach(village => {
-      if (!village.amenities) return
-      
-      const amenities = village.amenities
-      if (amenities.water === 0) gaps.water++
-      if (amenities.electricity < 80) gaps.electricity++
-      if (amenities.schools === 0) gaps.education++
-      if (amenities.health_centers === 0) gaps.healthcare++
-      if (amenities.toilets < 70) gaps.sanitation++
-      if (amenities.internet < 50) gaps.connectivity++
-    })
-
-    return Object.entries(gaps).map(([key, value]) => ({
-      name: key.charAt(0).toUpperCase() + key.slice(1),
       villages: value,
       percentage: villages.length > 0 ? Math.round((value / villages.length) * 100) : 0
     }))
@@ -448,6 +367,35 @@ export default function Dashboard({ role: propRole }) {
             <span className="font-medium">Role:</span> {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)} Officer
           </div>
         </div>
+
+        {/* Village Functionary Upload Section */}
+        {user?.role === 'village' && (
+          <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">Upload Village Data (Excel/CSV)</h2>
+            <p className="mb-4 text-gray-600 dark:text-gray-400">Upload your village's data in Excel or CSV format. This will be stored in the database.</p>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const fileInput = e.target.elements.villageFile;
+                if (!fileInput.files.length) return alert('Please select a file.');
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                try {
+                  await fetch('/api/upload_village_data', {
+                    method: 'POST',
+                    body: formData
+                  });
+                  alert('File uploaded successfully!');
+                } catch (err) {
+                  alert('Upload failed.');
+                }
+              }}
+            >
+              <input type="file" name="villageFile" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" className="mb-2" />
+              <button type="submit" className="ml-2 px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700">Upload</button>
+            </form>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -732,41 +680,6 @@ export default function Dashboard({ role: propRole }) {
               <Link to="/gaps" className="ml-2 text-primary-600 hover:text-primary-700">
                 View all problems →
               </Link>
-            </div>
-          )}
-        </div>
-
-        {/* Unique Projects Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Projects ({projects.length})
-          </h3>
-          {projects.length === 0 ? (
-            <div className="text-gray-500 dark:text-gray-400">No projects found for your region.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Name</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Budget</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Timeline</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Priority</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {projects.map((project) => (
-                    <tr key={project.id}>
-                      <td className="px-4 py-2 font-medium text-gray-900 dark:text-white">{project.name || project.description || 'Untitled'}</td>
-                      <td className="px-4 py-2 text-sm">{project.status || 'N/A'}</td>
-                      <td className="px-4 py-2 text-sm">{project.budget ? `₹${project.budget.toLocaleString()}` : 'N/A'}</td>
-                      <td className="px-4 py-2 text-sm">{project.timeline || 'N/A'}</td>
-                      <td className="px-4 py-2 text-sm">{project.priority || 'N/A'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           )}
         </div>
