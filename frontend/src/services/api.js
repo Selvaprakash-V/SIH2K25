@@ -2,7 +2,7 @@ import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
   import.meta.env.PROD 
-    ? 'https://sih2k25.vercel.app/api' 
+    ? 'https://rural-m0mq1zfxi-yugenjrs-projects.vercel.app/api' 
     : 'http://localhost:8002'
 )
 

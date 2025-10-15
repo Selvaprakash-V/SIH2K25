@@ -1,0 +1,11 @@
+backend/
+data/
+docs/
+frontend/
+*.json
+*.md
+*.txt
+setup.*
+__pycache__
+*.pyc
+node_modules/

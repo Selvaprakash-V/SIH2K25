@@ -37,7 +37,7 @@ export default function Login() {
   // Fetch districts when state changes
   useEffect(() => {
     if (form.state) {
-      api.get(`/districts/${form.state}`)
+      api.get(`/districts?state=${form.state}`)
         .then(res => setDistricts(res.data.districts || []))
         .catch(() => setDistricts([]));
     } else {
