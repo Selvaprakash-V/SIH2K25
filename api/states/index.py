@@ -1,6 +1,5 @@
 from http.server import BaseHTTPRequestHandler
 import json
-from pymongo import MongoClient
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -12,46 +11,56 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
         
         try:
-            # MongoDB connection
-            MONGO_URI = "mongodb+srv://yugenjr847:yugen842007@zeroday1.0mwqypn.mongodb.net/sih2?retryWrites=true&w=majority&appName=Zeroday1"
-            client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-            db = client.sih2
-            
-            # Try to get states from villages collection
-            villages_collection = db.villages
-            states = villages_collection.distinct("state")
-            
-            # If no data in database, use fallback data
-            if not states:
-                states = [
-                    "Sikkim",
-                    "West Bengal", 
-                    "Assam",
-                    "Arunachal Pradesh",
-                    "Manipur",
-                    "Meghalaya",
-                    "Mizoram",
-                    "Nagaland",
-                    "Tripura"
-                ]
-            
-            response = {"states": sorted(states)}
-            client.close()
-            
+            # Try to import and use MongoDB
+            try:
+                from pymongo import MongoClient
+                
+                # MongoDB connection
+                MONGO_URI = "mongodb+srv://yugenjr847:yugen842007@zeroday1.0mwqypn.mongodb.net/sih2?retryWrites=true&w=majority&appName=Zeroday1"
+                client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)
+                db = client.sih2
+                
+                # Try to get states from villages collection
+                villages_collection = db.villages
+                states = villages_collection.distinct("state")
+                
+                if states:
+                    response = {
+                        "states": sorted(states),
+                        "source": "database",
+                        "count": len(states)
+                    }
+                else:
+                    # No data in database, use fallback
+                    response = {
+                        "states": ["Sikkim", "West Bengal", "Assam", "Arunachal Pradesh", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Tripura"],
+                        "source": "fallback_no_data",
+                        "count": 9
+                    }
+                
+                client.close()
+                
+            except ImportError:
+                # PyMongo not available, use fallback
+                response = {
+                    "states": ["Sikkim", "West Bengal", "Assam", "Arunachal Pradesh", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Tripura"],
+                    "source": "fallback_no_pymongo",
+                    "count": 9
+                }
+            except Exception as db_error:
+                # Database connection failed, use fallback
+                response = {
+                    "states": ["Sikkim", "West Bengal", "Assam", "Arunachal Pradesh", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Tripura"],
+                    "source": f"fallback_db_error: {str(db_error)}",
+                    "count": 9
+                }
+                
         except Exception as e:
-            # Fallback to mock data if database connection fails
+            # Complete fallback
             response = {
-                "states": [
-                    "Sikkim",
-                    "West Bengal", 
-                    "Assam",
-                    "Arunachal Pradesh",
-                    "Manipur",
-                    "Meghalaya",
-                    "Mizoram",
-                    "Nagaland",
-                    "Tripura"
-                ]
+                "states": ["Sikkim"],
+                "source": f"complete_fallback: {str(e)}",
+                "count": 1
             }
         
         self.wfile.write(json.dumps(response).encode())

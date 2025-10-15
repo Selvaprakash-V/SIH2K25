@@ -1,8 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 import json
-import os
-from pymongo import MongoClient
-from urllib.parse import quote_plus
+import urllib.request
+import urllib.error
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -14,50 +13,56 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
         
         try:
-            # MongoDB connection
-            MONGO_URI = "mongodb+srv://yugenjr847:yugen842007@zeroday1.0mwqypn.mongodb.net/sih2?retryWrites=true&w=majority&appName=Zeroday1"
-            
-            # Test connection
-            client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-            db = client.sih2
-            
-            # Test database connection
-            client.admin.command('ping')
-            
-            # Get collection stats
-            collections = db.list_collection_names()
-            
-            # Try to get some sample data
-            villages_count = 0
-            sample_villages = []
-            if 'villages' in collections:
-                villages_collection = db.villages
-                villages_count = villages_collection.count_documents({})
-                sample_villages = list(villages_collection.find().limit(3))
-                
-                # Convert ObjectId to string for JSON serialization
-                for village in sample_villages:
-                    village['_id'] = str(village['_id'])
-            
+            # First test - simple connectivity check
             response = {
-                "status": "connected",
-                "message": "MongoDB Atlas connection successful!",
-                "database": "sih2",
-                "collections": collections,
-                "villages_count": villages_count,
-                "sample_villages": sample_villages
+                "status": "testing",
+                "message": "Database test endpoint is working",
+                "python_version": "Available",
+                "imports": {
+                    "json": "✅ Available",
+                    "urllib": "✅ Available"
+                }
             }
             
-            client.close()
+            # Try to import pymongo
+            try:
+                import pymongo
+                response["imports"]["pymongo"] = "✅ Available"
+                response["pymongo_version"] = pymongo.version
+                
+                # Try actual connection
+                try:
+                    from pymongo import MongoClient
+                    MONGO_URI = "mongodb+srv://yugenjr847:yugen842007@zeroday1.0mwqypn.mongodb.net/sih2?retryWrites=true&w=majority&appName=Zeroday1"
+                    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+                    
+                    # Test ping
+                    client.admin.command('ping')
+                    response["database_connection"] = "✅ Connected"
+                    
+                    # Get database info
+                    db = client.sih2
+                    collections = db.list_collection_names()
+                    response["collections"] = collections
+                    response["database"] = "sih2"
+                    
+                    client.close()
+                    
+                except Exception as db_error:
+                    response["database_connection"] = f"❌ Failed: {str(db_error)}"
+                    
+            except ImportError as import_error:
+                response["imports"]["pymongo"] = f"❌ Import Failed: {str(import_error)}"
+                response["database_connection"] = "❌ PyMongo not available"
             
         except Exception as e:
             response = {
                 "status": "error",
-                "message": f"Database connection failed: {str(e)}",
+                "message": f"Test failed: {str(e)}",
                 "error_type": type(e).__name__
             }
         
-        self.wfile.write(json.dumps(response).encode())
+        self.wfile.write(json.dumps(response, indent=2).encode())
         return
     
     def do_OPTIONS(self):
