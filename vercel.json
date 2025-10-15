@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "name": "rural-iq",
   "builds": [
     {
       "src": "frontend/package.json",
@@ -29,10 +28,5 @@
       "dest": "/frontend/dist/index.html"
     }
   ],
-  "outputDirectory": "frontend/dist",
-  "functions": {
-    "api/index.py": {
-      "runtime": "python3.9"
-    }
-  }
+  "outputDirectory": "frontend/dist"
 }
