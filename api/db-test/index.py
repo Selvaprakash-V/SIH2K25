@@ -1,6 +1,8 @@
 from http.server import BaseHTTPRequestHandler
 import json
+import os
 from pymongo import MongoClient
+from urllib.parse import quote_plus
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -14,44 +16,45 @@ class handler(BaseHTTPRequestHandler):
         try:
             # MongoDB connection
             MONGO_URI = "mongodb+srv://yugenjr847:yugen842007@zeroday1.0mwqypn.mongodb.net/sih2?retryWrites=true&w=majority&appName=Zeroday1"
+            
+            # Test connection
             client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
             db = client.sih2
             
-            # Try to get states from villages collection
-            villages_collection = db.villages
-            states = villages_collection.distinct("state")
+            # Test database connection
+            client.admin.command('ping')
             
-            # If no data in database, use fallback data
-            if not states:
-                states = [
-                    "Sikkim",
-                    "West Bengal", 
-                    "Assam",
-                    "Arunachal Pradesh",
-                    "Manipur",
-                    "Meghalaya",
-                    "Mizoram",
-                    "Nagaland",
-                    "Tripura"
-                ]
+            # Get collection stats
+            collections = db.list_collection_names()
             
-            response = {"states": sorted(states)}
+            # Try to get some sample data
+            villages_count = 0
+            sample_villages = []
+            if 'villages' in collections:
+                villages_collection = db.villages
+                villages_count = villages_collection.count_documents({})
+                sample_villages = list(villages_collection.find().limit(3))
+                
+                # Convert ObjectId to string for JSON serialization
+                for village in sample_villages:
+                    village['_id'] = str(village['_id'])
+            
+            response = {
+                "status": "connected",
+                "message": "MongoDB Atlas connection successful!",
+                "database": "sih2",
+                "collections": collections,
+                "villages_count": villages_count,
+                "sample_villages": sample_villages
+            }
+            
             client.close()
             
         except Exception as e:
-            # Fallback to mock data if database connection fails
             response = {
-                "states": [
-                    "Sikkim",
-                    "West Bengal", 
-                    "Assam",
-                    "Arunachal Pradesh",
-                    "Manipur",
-                    "Meghalaya",
-                    "Mizoram",
-                    "Nagaland",
-                    "Tripura"
-                ]
+                "status": "error",
+                "message": f"Database connection failed: {str(e)}",
+                "error_type": type(e).__name__
             }
         
         self.wfile.write(json.dumps(response).encode())

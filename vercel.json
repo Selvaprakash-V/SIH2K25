@@ -1,43 +1,7 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "buildCommand": "cd frontend && npm install && npm run build",
-        "outputDirectory": "frontend/dist"
-      }
+  "functions": {
+    "api/**/*.py": {
+      "runtime": "@vercel/python@1.0.0"
     }
-  ],
-  "routes": [
-    {
-      "src": "/api/health",
-      "dest": "/api/health/index.py"
-    },
-    {
-      "src": "/api/states", 
-      "dest": "/api/states/index.py"
-    },
-    {
-      "src": "/api/villages",
-      "dest": "/api/villages/index.py"
-    },
-    {
-      "src": "/api/districts/(.*)",
-      "dest": "/api/districts/[state].py"
-    },
-    {
-      "src": "/api",
-      "dest": "/api/index.py"
-    },
-    {
-      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|ico|svg))",
-      "dest": "/frontend/dist/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/frontend/dist/index.html"
-    }
-  ]
+  }
 }
