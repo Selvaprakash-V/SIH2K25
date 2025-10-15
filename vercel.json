@@ -9,9 +9,17 @@
         "distDir": "dist",
         "buildCommand": "cd frontend && npm run build"
       }
+    },
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.py"
+    },
     {
       "src": "/assets/(.*)",
       "dest": "/frontend/dist/assets/$1"
@@ -21,5 +29,10 @@
       "dest": "/frontend/dist/index.html"
     }
   ],
-  "outputDirectory": "frontend/dist"
+  "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.9"
+    }
+  }
 }
