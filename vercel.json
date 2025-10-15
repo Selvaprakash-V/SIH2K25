@@ -5,7 +5,7 @@
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "buildCommand": "cd frontend && npm run build",
+        "buildCommand": "cd frontend && npm install && npm run build",
         "outputDirectory": "frontend/dist"
       }
     }
@@ -16,7 +16,7 @@
       "dest": "/api/health/index.py"
     },
     {
-      "src": "/api/states",
+      "src": "/api/states", 
       "dest": "/api/states/index.py"
     },
     {
@@ -32,8 +32,8 @@
       "dest": "/api/index.py"
     },
     {
-      "src": "/assets/(.*)",
-      "dest": "/frontend/dist/assets/$1"
+      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|ico|svg))",
+      "dest": "/frontend/dist/$1"
     },
     {
       "src": "/(.*)",
